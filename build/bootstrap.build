@@ -1,0 +1,7 @@
+project = libmonadicpp
+
+using version
+using config
+using test
+using install
+using dist

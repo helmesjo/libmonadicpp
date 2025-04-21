@@ -1,0 +1,43 @@
+intf_libs = # Interface dependencies.
+impl_libs = # Implementation dependencies.
+#import xxxx_libs += libhello%lib{hello}
+
+lib{monadicpp}: libul{monadicpp}: {hxx ixx txx cxx}{** -version} hxx{version} $impl_libs $intf_libs
+
+libs{monadicpp}: def{monadicpp}: include = ($cxx.target.system == 'win32-msvc')
+def{monadicpp}: libul{monadicpp}
+
+hxx{version}: in{version} $src_root/manifest
+
+# Build options.
+#
+cxx.poptions =+ "-I$out_root" "-I$src_root"
+
+if ($cxx.target.system == 'mingw32')
+  cxx.loptions += -Wl,--export-all-symbols
+
+# Export options.
+#
+lib{monadicpp}:
+{
+  cxx.export.poptions = "-I$out_root" "-I$src_root"
+  cxx.export.libs = $intf_libs
+}
+
+# For pre-releases use the complete version to make sure they cannot
+# be used in place of another pre-release or the final version. See
+# the version module for details on the version.* variable values.
+#
+if $version.pre_release
+  lib{monadicpp}: bin.lib.version = "-$version.project_id"
+else
+  lib{monadicpp}: bin.lib.version = "-$version.major.$version.minor"
+
+# Install into the libmonadicpp/ subdirectory of, say, /usr/include/
+# recreating subdirectories.
+#
+{hxx ixx txx}{*}:
+{
+  install         = include/libmonadicpp/
+  install.subdirs = true
+}
