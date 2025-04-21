@@ -1,35 +1,39 @@
-#include <sstream>
-#include <stdexcept>
-
+#include <libmonadicpp/monad.hxx>
 #include <libmonadicpp/version.hxx>
-#include <libmonadicpp/monadicpp.hxx>
 
 #undef NDEBUG
 #include <cassert>
 
-int main ()
+auto
+main() -> int
 {
-  using namespace std;
-  using namespace monadicpp;
+  using namespace fho;
 
-  // Basics.
-  //
-  {
-    ostringstream o;
-    say_hello (o, "World");
-    assert (o.str () == "Hello, World!\n");
-  }
+  constexpr auto m1 = pure(
+    []()
+    {
+      return 0.0;
+    });
+  (void)m1;
+  constexpr auto m2 = pure(2);
+  constexpr auto m3 = m2.map(
+    [](int x)
+    {
+      return std::to_string(x);
+    });
 
-  // Empty name.
-  //
-  try
-  {
-    ostringstream o;
-    say_hello (o, "");
-    assert (false);
-  }
-  catch (const invalid_argument& e)
-  {
-    assert (e.what () == string ("empty name"));
-  }
+  constexpr auto m4 = m3.map(
+    [](std::string x) -> double
+    {
+      return std::stoi(x);
+    });
+
+  constexpr auto m5 = m4.bind(
+    [](double x)
+    {
+      return pure(x + 1);
+    });
+
+  assert(m5.value() + m4.value() == 5.0);
+  return 0;
 }
