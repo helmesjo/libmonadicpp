@@ -2,7 +2,6 @@
 
 #include <concepts>
 #include <functional>
-#include <string>
 #include <type_traits>
 #include <utility>
 
@@ -143,12 +142,38 @@ namespace fho
   static_assert(monadic_func<detail::null_monadic_func, int>);
   static_assert(pure_func<detail::null_pure_func, int>);
 
-  template<typename T, invocable_r<T> Func, typename Sig = detail::signature_t<Func>>
+  struct identity
+  {
+    template<pure_func C, pure_func<std::invoke_result_t<C>> B>
+    constexpr auto
+    operator()(C&& compute, B&& bind) const
+    {
+      return [c = FWD(compute), b = FWD(bind)]()
+      {
+        return b(std::forward<C>(c)());
+      };
+    }
+
+    template<pure_func C, monadic_func<std::invoke_result_t<C>> B>
+    constexpr auto
+    operator()(C&& compute, B&& bind) const
+    {
+      return [c = FWD(compute), b = FWD(bind)]()
+      {
+        return b(std::forward<C>(c)()).value();
+      };
+    }
+  };
+
+  template<typename Morphism, typename T, invocable_r<T> Func,
+           typename Sig = detail::signature_t<Func>>
   class monad
   {
   public:
     using value_type   = T;
     using compute_type = Func;
+
+    static constexpr auto morphism = Morphism{};
 
     constexpr monad(monad const&)                    = delete;
     constexpr monad(monad&&)                         = default;
@@ -164,12 +189,9 @@ namespace fho
     [[nodiscard]] constexpr auto
     map(F f) const
     {
+      auto l  = morphism(comp_, f);
       using U = std::invoke_result_t<F, value_type>;
-      auto l  = [in = comp_, f = std::move(f)]() -> U
-      {
-        return f(in());
-      };
-      using M = monad<U, decltype(l), detail::signature_t<decltype(l), Sig>>;
+      using M = monad<Morphism, U, decltype(l), detail::signature_t<decltype(l), Sig>>;
       return M(std::move(l));
     }
 
@@ -177,13 +199,10 @@ namespace fho
     [[nodiscard]] constexpr auto
     bind(F f) const
     {
+      auto l  = morphism(comp_, f);
       using U = std::invoke_result_t<F, value_type>;
       using V = typename U::value_type;
-      auto l  = [in = comp_, f = std::move(f)]() -> V
-      {
-        return f(in()).value();
-      };
-      using M = monad<V, decltype(l), detail::signature_t<decltype(l), Sig>>;
+      using M = monad<Morphism, V, decltype(l), detail::signature_t<decltype(l), Sig>>;
       return M(std::move(l));
     }
 
@@ -197,15 +216,15 @@ namespace fho
     compute_type comp_;
   };
 
-  template<std::invocable Func>
+  template<typename Morphism = identity, std::invocable Func>
   static constexpr auto
   pure(Func f) noexcept
   {
     using value_t = std::invoke_result_t<Func>;
-    return monad<value_t, Func, detail::signature_t<Func>>(std::move(f));
+    return monad<Morphism, value_t, Func, detail::signature_t<Func>>(std::move(f));
   }
 
-  template<typename T>
+  template<typename Morphism = identity, typename T>
     requires (!std::invocable<T>)
   static constexpr auto
   pure(T v) noexcept
@@ -214,7 +233,7 @@ namespace fho
     {
       return v;
     };
-    return monad<T, decltype(f), detail::signature_t<decltype(f)>>{f};
+    return monad<Morphism, T, decltype(f), detail::signature_t<decltype(f)>>{std::move(f)};
   }
 
   // Static assertions for monad laws
