@@ -15,10 +15,12 @@ namespace fho
   /// value extraction method.
   template<typename T>
   concept monadic = requires (T t) {
-                      typename T::value_type;
+                      typename std::remove_cvref_t<T>::value_type;
                       t.map(std::declval<detail::null_pure_func>());
                       t.bind(std::declval<detail::null_monadic_func>());
-                      { t.value() } -> std::convertible_to<typename T::value_type>;
+                      {
+                        t.value()
+                      } -> std::convertible_to<typename std::remove_cvref_t<T>::value_type>;
                     };
 
   /// @brief Concept for functor types.
@@ -48,13 +50,23 @@ namespace fho
                           { std::invoke(t, std::forward<Args>(args)...) } -> std::convertible_to<R>;
                         };
 
+  template<typename F, typename M>
+  concept mappable = functor<M> && pure_func<F, typename std::remove_cvref_t<M>::value_type>;
+
+  template<typename F, typename M>
+  concept bindable = monadic<M> && monadic_func<F, typename std::remove_cvref_t<M>::value_type>;
+
+  template<typename MF, typename M>
+  concept applicative = functor<MF> && mappable<M, typename std::remove_cvref_t<MF>::value_type>;
+
   static_assert(monadic<detail::null_monad<int>>);
   static_assert(functor<detail::null_monad<int>>);
   static_assert(functor<detail::null_functor<int>>);
   static_assert(monadic_func<detail::null_monadic_func, int>);
   static_assert(pure_func<detail::null_pure_func, int>);
+  static_assert(mappable<detail::null_pure_func, detail::null_monad<int>>);
 
-  /// @brief Identity functor for monad transformations.
+  /// @brief Identity function for monad transformations.
   /// @details Acts as a default morphism in monadic operations, passing values through computations
   /// and bindings without modification.
   struct identity
@@ -99,10 +111,10 @@ namespace fho
       : comp_(std::move(func))
     {}
 
-    constexpr monad(monad const&)                    = delete;
+    constexpr monad(monad const&)                    = default;
     constexpr monad(monad&&)                         = default;
     constexpr ~monad()                               = default;
-    constexpr auto operator=(monad const&) -> monad& = delete;
+    constexpr auto operator=(monad const&) -> monad& = default;
     constexpr auto operator=(monad&&) -> monad&      = default;
 
     /// @brief Applies a function to the monad’s value, returning a new monad.
@@ -130,6 +142,22 @@ namespace fho
       using V = typename U::value_type;
       using M = monad<Morphism, V, decltype(l), detail::signature_t<decltype(l), Sig>>;
       return M(std::move(l));
+    }
+
+    /// @brief Applies a function wrapped in a monad to the monad's value (`<*>` in Haskell).
+    /// @tparam MF The monad type containing the function.
+    /// @param mf The monad containing the function to apply.
+    /// @return A new monad with the result of applying the function.
+    template<monadic MF>
+    [[nodiscard]] constexpr auto
+    ap(MF&& mf) const
+    {
+      using self_t = decltype(*this);
+      return FWD(mf).bind(
+        [self = *this](pure_func<value_type> auto&& f)
+        {
+          return static_cast<self_t>(self).map(FWD(f));
+        });
     }
 
     /// @brief Extracts the monad’s value by running the computation.
@@ -170,6 +198,45 @@ namespace fho
     return monad<Morphism, T, decltype(f), detail::signature_t<decltype(f)>>{std::move(f)};
   }
 
+  /// @brief Maps a pure function over a functor (fmap in Haskell).
+  /// @tparam F The type of the pure function.
+  /// @tparam M The functor/monad type.
+  /// @param f The pure function to apply.
+  /// @param m The functor/monad to map over.
+  /// @return A new functor/monad with the transformed value.
+  template<functor M, mappable<M> F>
+  constexpr auto
+  fmap(F&& f, M&& m) noexcept
+  {
+    return FWD(m).map(FWD(f));
+  }
+
+  /// @brief Binds a monadic function to a monad (>>= in Haskell).
+  /// @tparam F The type of the monadic function.
+  /// @tparam M The monad type.
+  /// @param m The monad to bind.
+  /// @param f The monadic function to apply.
+  /// @return A new monad with the result of the monadic function.
+  template<monadic M, bindable<M> F>
+  constexpr auto
+  bind(M&& m, F&& f) noexcept
+  {
+    return FWD(m).bind(FWD(f));
+  }
+
+  /// @brief Applies a function wrapped in a monad to a value wrapped in a monad (<*> in Haskell).
+  /// @tparam MF The monad type containing the function.
+  /// @tparam M The monad type containing the value.
+  /// @param mf The monad containing the function.
+  /// @param m The monad containing the value.
+  /// @return A new monad with the result of applying the function to the value.
+  template<monadic MF, monadic M>
+  constexpr auto
+  ap(MF&& mf, M&& m) noexcept
+  {
+    return FWD(m).ap(FWD(mf));
+  }
+
   /// @brief Verifies monad laws through static assertions.
   /// @details Ensures the monad implementation satisfies left identity, right identity,
   /// associativity, and functor laws.
@@ -194,12 +261,11 @@ namespace fho
     []
     {
       auto m = pure(42);
-      return m.bind(
-                [](int v)
-                {
-                  return pure(v);
-                })
-               .value() == m.value();
+      auto f = [](int v)
+      {
+        return pure(v);
+      };
+      return m.bind(f).value() == m.value();
     }());
 
   /// @brief Associativity Law: (m >>= f) >>= g == m >>= (x -> f(x) >>= g).
