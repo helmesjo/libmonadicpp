@@ -16,7 +16,7 @@ namespace fho
   template<typename T>
   concept monadic = requires (T t) {
                       typename std::remove_cvref_t<T>::value_type;
-                      t.map(std::declval<detail::null_pure_func>());
+                      t.fmap(std::declval<detail::null_pure_func>());
                       t.bind(std::declval<detail::null_monadic_func>());
                       {
                         t.value()
@@ -27,7 +27,7 @@ namespace fho
   /// @details Checks if a type supports map operation returning a monadic type.
   template<typename T>
   concept functor = requires (T t) {
-                      { t.map(std::declval<detail::null_pure_func>()) } -> monadic;
+                      { t.fmap(std::declval<detail::null_pure_func>()) } -> monadic;
                     };
 
   /// @brief Concept for functions returning monadic types.
@@ -122,7 +122,7 @@ namespace fho
     /// @return New monad with the transformed result.
     template<pure_func<value_type> F>
     [[nodiscard]] constexpr auto
-    map(F f) const
+    fmap(F f) const
     {
       auto l  = morphism(comp_, f);
       using U = std::invoke_result_t<F, value_type>;
@@ -156,7 +156,7 @@ namespace fho
       return FWD(mf).bind(
         [self = *this](pure_func<value_type> auto&& f)
         {
-          return static_cast<self_t>(self).map(FWD(f));
+          return static_cast<self_t>(self).fmap(FWD(f));
         });
     }
 
@@ -208,7 +208,7 @@ namespace fho
   constexpr auto
   fmap(F&& f, M&& m) noexcept
   {
-    return FWD(m).map(FWD(f));
+    return FWD(m).fmap(FWD(f));
   }
 
   /// @brief Binds a monadic function to a monad (>>= in Haskell).
@@ -301,7 +301,7 @@ namespace fho
       {
         return v;
       };
-      return m.map(id).value() == m.value();
+      return m.fmap(id).value() == m.value();
     }());
 
   /// @brief Functor Composition Law: fmap (f . g) == fmap f . fmap g.
@@ -319,12 +319,12 @@ namespace fho
       {
         return v * 2;
       };
-      auto lhs = m.map(
+      auto lhs = m.fmap(
         [=](int v)
         {
           return f(g(v));
         });
-      auto rhs = m.map(g).map(f);
+      auto rhs = m.fmap(g).fmap(f);
       return lhs.value() == rhs.value();
     }());
 }

@@ -18,13 +18,13 @@ main() -> int
     });
   (void)m1;
   constexpr auto m2 = pure(2);
-  constexpr auto m3 = m2.map(
+  constexpr auto m3 = m2.fmap(
     [](int x)
     {
       return std::to_string(x);
     });
 
-  constexpr auto m4 = m3.map(
+  constexpr auto m4 = m3.fmap(
     [](std::string x) -> double
     {
       return std::stoi(x);

@@ -42,7 +42,7 @@ namespace fho::detail
   {
     using value_type = T;
 
-    constexpr auto map(auto&&) const -> null_monad;
+    constexpr auto fmap(auto&&) const -> null_monad;
     constexpr auto bind(auto&&) const -> null_monad;
 
     [[nodiscard]] constexpr auto
@@ -57,7 +57,7 @@ namespace fho::detail
   template<typename T>
   struct null_functor
   {
-    constexpr auto map(auto&&) const -> null_monad<std::remove_cvref_t<T>>;
+    constexpr auto fmap(auto&&) const -> null_monad<std::remove_cvref_t<T>>;
   };
 
   /// @brief A null monadic function.
