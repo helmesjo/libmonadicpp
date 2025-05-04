@@ -1,6 +1,8 @@
 #include <monadicpp/monad.hxx>
 #include <monadicpp/version.hxx>
 
+#include <string>
+
 #undef NDEBUG
 #include <cassert>
 
