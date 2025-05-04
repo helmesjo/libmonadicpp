@@ -1,5 +1,7 @@
 #pragma once
 
+#include <libmonadicpp/detail/func_traits.hxx>
+
 #include <concepts>
 #include <functional>
 #include <type_traits>
@@ -11,41 +13,6 @@ namespace fho
 {
   namespace detail
   {
-    template<typename T>
-    struct function_signature;
-
-    // Specialization for function pointers
-    template<typename R, typename... Args>
-    struct function_signature<R (*)(Args...)>
-    {
-      using type = R(Args...);
-    };
-
-    // Specialization for std::function
-    template<typename R, typename... Args>
-    struct function_signature<std::function<R(Args...)>>
-    {
-      using type = R(Args...);
-    };
-
-    // Specialization for member functions (e.g., operator() in functors)
-    template<typename Class, typename R, typename... Args>
-    struct function_signature<R (Class::*)(Args...) const>
-    {
-      using type = R(Args...);
-    };
-
-    // Primary template for callables (lambdas, functors)
-    template<typename T>
-    struct function_signature
-    {
-      // Extract operator() signature
-      using type = typename function_signature<decltype(&T::operator())>::type;
-    };
-
-    template<typename T>
-    using function_signature_t = typename function_signature<T>::type;
-
     template<typename... Computations>
     struct monad_signature
     {};
@@ -110,6 +77,9 @@ namespace fho
     };
   }
 
+  /// @brief Concept for monadic types.
+  /// @details Ensures a type has a value type, supports map and bind operations, and provides a
+  /// value extraction method.
   template<typename T>
   concept monadic = requires (T t) {
                       typename T::value_type;
@@ -118,19 +88,28 @@ namespace fho
                       { t.value() } -> std::convertible_to<typename T::value_type>;
                     };
 
+  /// @brief Concept for functor types.
+  /// @details Checks if a type supports map operation returning a monadic type.
   template<typename T>
   concept functor = requires (T t) {
                       { t.map(std::declval<detail::null_pure_func>()) } -> monadic;
                     };
 
+  /// @brief Concept for functions returning monadic types.
+  /// @details Verifies that a function, when invoked with arguments, produces a monadic result.
   template<typename T, typename... Args>
   concept monadic_func = requires (T&& t, Args&&... args) {
                            { std::invoke(t, std::forward<Args>(args)...) } -> monadic;
                          };
 
+  /// @brief Concept for pure functions.
+  /// @details Ensures a function is invocable and does not return a monadic type.
   template<typename T, typename... Args>
   concept pure_func = std::invocable<T, Args...> && (!monadic<std::invoke_result_t<T, Args...>>);
 
+  /// @brief Concept for invocable types with specific return type.
+  /// @details Checks if a function, when invoked, returns a type convertible to the specified
+  /// return type.
   template<typename T, typename R, typename... Args>
   concept invocable_r = requires (T&& t, Args&&... args) {
                           { std::invoke(t, std::forward<Args>(args)...) } -> std::convertible_to<R>;
@@ -142,6 +121,9 @@ namespace fho
   static_assert(monadic_func<detail::null_monadic_func, int>);
   static_assert(pure_func<detail::null_pure_func, int>);
 
+  /// @brief Identity functor for monad transformations.
+  /// @details Acts as a default morphism in monadic operations, passing values through computations
+  /// and bindings without modification.
   struct identity
   {
     template<pure_func C, pure_func<std::invoke_result_t<C>> B>
@@ -165,6 +147,9 @@ namespace fho
     }
   };
 
+  /// @brief A monad class for functional programming in C++.
+  /// @details Wraps a computation (function) and supports operations like mapping and binding,
+  /// using a morphism to transform results.
   template<typename Morphism, typename T, invocable_r<T> Func,
            typename Sig = detail::signature_t<Func>>
   class monad
@@ -175,16 +160,21 @@ namespace fho
 
     static constexpr auto morphism = Morphism{};
 
+    /// @brief Constructs a monad with a computation function.
+    /// @param func The function producing the monad's value.
+    constexpr explicit monad(Func func)
+      : comp_(std::move(func))
+    {}
+
     constexpr monad(monad const&)                    = delete;
     constexpr monad(monad&&)                         = default;
     constexpr ~monad()                               = default;
     constexpr auto operator=(monad const&) -> monad& = delete;
     constexpr auto operator=(monad&&) -> monad&      = default;
 
-    constexpr explicit monad(Func func)
-      : comp_(std::move(func))
-    {}
-
+    /// @brief Applies a function to the monad’s value, returning a new monad.
+    /// @param f Function to transform the value.
+    /// @return New monad with the transformed result.
     template<pure_func<value_type> F>
     [[nodiscard]] constexpr auto
     map(F f) const
@@ -195,6 +185,9 @@ namespace fho
       return M(std::move(l));
     }
 
+    /// @brief Chains a monad-producing function to the monad’s value.
+    /// @param f Function that takes the value and returns a new monad.
+    /// @return New monad with the chained result.
     template<monadic_func<value_type> F>
     [[nodiscard]] constexpr auto
     bind(F f) const
@@ -206,6 +199,8 @@ namespace fho
       return M(std::move(l));
     }
 
+    /// @brief Extracts the monad’s value by running the computation.
+    /// @return The computed value.
     [[nodiscard]] constexpr auto
     value() const -> value_type
     {
@@ -216,6 +211,9 @@ namespace fho
     compute_type comp_;
   };
 
+  /// @brief Creates a monad from a function.
+  /// @param f Function producing the monad’s value.
+  /// @return A monad wrapping the function.
   template<typename Morphism = identity, std::invocable Func>
   static constexpr auto
   pure(Func f) noexcept
@@ -224,6 +222,9 @@ namespace fho
     return monad<Morphism, value_t, Func, detail::signature_t<Func>>(std::move(f));
   }
 
+  /// @brief Creates a monad from a plain value.
+  /// @param v Value to wrap in the monad.
+  /// @return A monad wrapping a function that returns the value.
   template<typename Morphism = identity, typename T>
     requires (!std::invocable<T>)
   static constexpr auto
@@ -236,9 +237,13 @@ namespace fho
     return monad<Morphism, T, decltype(f), detail::signature_t<decltype(f)>>{std::move(f)};
   }
 
-  // Static assertions for monad laws
-  //
-  // 1. Left Identity: pure(x) >>= f == f(x)
+  /// @brief Verifies monad laws through static assertions.
+  /// @details Ensures the monad implementation satisfies left identity, right identity,
+  /// associativity, and functor laws.
+
+  /// @brief Left Identity Law: pure(x) >>= f == f(x).
+  /// @details Checks that wrapping a value and binding it to a function yields the same result as
+  /// applying the function directly.
   static_assert(
     []
     {
@@ -250,7 +255,8 @@ namespace fho
       return pure(x).bind(f).value() == f(x).value();
     }());
 
-  // 2. Right Identity: m >>= pure == m
+  /// @brief Right Identity Law: m >>= pure == m.
+  /// @details Verifies that binding a monad to the pure function returns the original monad.
   static_assert(
     []
     {
@@ -263,7 +269,8 @@ namespace fho
                .value() == m.value();
     }());
 
-  // 3. Associativity: (m >>= f) >>= g == m >>= (x -> f(x) >>= g)
+  /// @brief Associativity Law: (m >>= f) >>= g == m >>= (x -> f(x) >>= g).
+  /// @details Ensures that chaining monad operations is consistent regardless of grouping.
   static_assert(
     []
     {
@@ -285,7 +292,8 @@ namespace fho
       return lhs.value() == rhs.value();
     }());
 
-  // Bonus: Functor identity law for map: fmap id == id
+  /// @brief Functor Identity Law: fmap id == id.
+  /// @details Confirms that mapping the identity function over a monad leaves it unchanged.
   static_assert(
     []
     {
@@ -297,7 +305,9 @@ namespace fho
       return m.map(id).value() == m.value();
     }());
 
-  // Bonus: Functor composition law for map: fmap (f . g) == fmap f . fmap g
+  /// @brief Functor Composition Law: fmap (f . g) == fmap f . fmap g.
+  /// @details Verifies that mapping a composed function is equivalent to mapping functions
+  /// sequentially.
   static_assert(
     []
     {
