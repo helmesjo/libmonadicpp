@@ -1,21 +1,21 @@
-# libmonadicpp - A C++ library
+# monadicpp - A C++ library
 
-The `libmonadicpp` C++ library provides <SUMMARY-OF-FUNCTIONALITY>.
+The `monadicpp` C++ library provides <SUMMARY-OF-FUNCTIONALITY>.
 
 
 ## Usage
 
-To start using `libmonadicpp` in your project, add the following `depends`
+To start using `monadicpp` in your project, add the following `depends`
 value to your `manifest`, adjusting the version constraint as appropriate:
 
 ```
-depends: libmonadicpp ^<VERSION>
+depends: monadicpp ^<VERSION>
 ```
 
 Then import the library in your `buildfile`:
 
 ```
-import libs = libmonadicpp%lib{<TARGET>}
+import libs = monadicpp%lib{<TARGET>}
 ```
 
 
@@ -35,7 +35,7 @@ lib{<TARGET>}
 This package provides the following configuration variables:
 
 ```
-[bool] config.libmonadicpp.<VARIABLE> ?= false
+[bool] config.monadicpp.<VARIABLE> ?= false
 ```
 
 <DESCRIPTION-OF-CONFIG-VARIABLES>

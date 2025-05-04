@@ -1,6 +1,6 @@
 $out_root/
 {
-  include libmonadicpp/
+  include monadicpp/
 }
 
-export $out_root/libmonadicpp/$import.target
+export $out_root/monadicpp/$import.target

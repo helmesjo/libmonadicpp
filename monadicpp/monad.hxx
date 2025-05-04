@@ -1,6 +1,6 @@
 #pragma once
 
-#include <libmonadicpp/detail/func_traits.hxx>
+#include <monadicpp/detail/func_traits.hxx>
 
 #include <concepts>
 #include <functional>

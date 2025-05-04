@@ -33,11 +33,11 @@ if $version.pre_release
 else
   lib{monadicpp}: bin.lib.version = "-$version.major.$version.minor"
 
-# Install into the libmonadicpp/ subdirectory of, say, /usr/include/
+# Install into the monadicpp/ subdirectory of, say, /usr/include/
 # recreating subdirectories.
 #
 {hxx ixx txx}{*}:
 {
-  install         = include/libmonadicpp/
+  install         = include/monadicpp/
   install.subdirs = true
 }

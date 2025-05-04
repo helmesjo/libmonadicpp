@@ -1,5 +1,5 @@
-#include <libmonadicpp/monad.hxx>
-#include <libmonadicpp/version.hxx>
+#include <monadicpp/monad.hxx>
+#include <monadicpp/version.hxx>
 
 #undef NDEBUG
 #include <cassert>
