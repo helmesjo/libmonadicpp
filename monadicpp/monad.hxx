@@ -66,28 +66,48 @@ namespace fho
   static_assert(pure_func<detail::null_pure_func, int>);
   static_assert(mappable<detail::null_pure_func, detail::null_monad<int>>);
 
-  /// @brief Identity function for monad transformations.
-  /// @details Acts as a default morphism in monadic operations, passing values through computations
-  /// and bindings without modification.
-  struct identity
+  /// @struct compose
+  /// @brief Constructs a morphism by composing a computation and a binding function.
+  ///
+  /// Combines a pure computation and a binding function into a new pure function (morphism).
+  /// Provides overloads for pure and monadic bindings.
+  struct compose
   {
-    template<pure_func C, pure_func<std::invoke_result_t<C>> B>
+    /// @brief Composes a pure computation with a pure binding function.
+    ///
+    /// @tparam Compute Pure function type of the computation (pure_func constraint).
+    /// @tparam Bind Pure binding function type (pure_func constraint).
+    ///
+    /// @param comp Pure function to compute a value.
+    /// @param binder Pure function to transform the computed value.
+    /// @return A lambda (morphism) that applies `comp` and passes its result to `binder`,
+    ///         returning `binder(comp())`.
+    template<pure_func Compute, pure_func<std::invoke_result_t<Compute>> Bind>
     constexpr auto
-    operator()(C&& compute, B&& bind) const
+    operator()(Compute&& comp, Bind&& binder) const
     {
-      return [c = FWD(compute), b = FWD(bind)]()
+      return [c = FWD(comp), b = FWD(binder)]()
       {
-        return b(std::forward<C>(c)());
+        return b(std::forward<Compute>(c)());
       };
     }
 
-    template<pure_func C, monadic_func<std::invoke_result_t<C>> B>
+    /// @brief Composes a pure computation with a monadic binding function.
+    ///
+    /// @tparam Compute Pure function type of the computation (pure_func constraint).
+    /// @tparam Bind Monadic binding function type (monadic_func constraint).
+    ///
+    /// @param comp Pure function to compute a value.
+    /// @param binder Monadic function to transform the computed value.
+    /// @return A lambda (morphism) that applies `comp`, passes its result to `binder`,
+    ///         and unwraps the monadic result, returning `binder(comp()).value()`.
+    template<pure_func Compute, monadic_func<std::invoke_result_t<Compute>> Bind>
     constexpr auto
-    operator()(C&& compute, B&& bind) const
+    operator()(Compute&& comp, Bind&& binder) const
     {
-      return [c = FWD(compute), b = FWD(bind)]()
+      return [c = FWD(comp), b = FWD(binder)]()
       {
-        return b(std::forward<C>(c)()).value();
+        return b(std::forward<Compute>(c)()).value();
       };
     }
   };
@@ -175,7 +195,7 @@ namespace fho
   /// @brief Creates a monad from a function.
   /// @param f Function producing the monad’s value.
   /// @return A monad wrapping the function.
-  template<typename Morphism = identity, std::invocable Func>
+  template<typename Morphism = compose, std::invocable Func>
   static constexpr auto
   pure(Func f) noexcept
   {
@@ -186,7 +206,7 @@ namespace fho
   /// @brief Creates a monad from a plain value.
   /// @param v Value to wrap in the monad.
   /// @return A monad wrapping a function that returns the value.
-  template<typename Morphism = identity, typename T>
+  template<typename Morphism = compose, typename T>
     requires (!std::invocable<T>)
   static constexpr auto
   pure(T v) noexcept
