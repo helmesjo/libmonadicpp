@@ -30,12 +30,13 @@ namespace fho
                       { t.fmap(std::declval<detail::null_pure_func>()) } -> monadic;
                     };
 
-  /// @brief Concept for functions returning monadic types.
-  /// @details Verifies that a function, when invoked with arguments, produces a monadic result.
+  /// @concept chainable_func
+  /// @brief Checks if a type is invocable and its result is either monadic or another callable.
+  /// Used for functions in monadic chaining (bind) or partial application (ap).
   template<typename T, typename... Args>
-  concept monadic_func = requires (T&& t, Args&&... args) {
-                           { std::invoke(t, std::forward<Args>(args)...) } -> monadic;
-                         };
+  concept chainable_func =
+    std::invocable<T, Args...> &&
+    (monadic<std::invoke_result_t<T, Args...>> || std::invocable<std::invoke_result_t<T, Args...>>);
 
   /// @brief Concept for pure functions.
   /// @details Ensures a function is invocable and does not return a monadic type.
@@ -54,7 +55,7 @@ namespace fho
   concept mappable = functor<M> && pure_func<F, typename std::remove_cvref_t<M>::value_type>;
 
   template<typename F, typename M>
-  concept bindable = monadic<M> && monadic_func<F, typename std::remove_cvref_t<M>::value_type>;
+  concept bindable = monadic<M> && chainable_func<F, typename std::remove_cvref_t<M>::value_type>;
 
   template<typename MF, typename M>
   concept applicative = functor<MF> && mappable<M, typename std::remove_cvref_t<MF>::value_type>;
@@ -62,7 +63,7 @@ namespace fho
   static_assert(monadic<detail::null_monad<int>>);
   static_assert(functor<detail::null_monad<int>>);
   static_assert(functor<detail::null_functor<int>>);
-  static_assert(monadic_func<detail::null_monadic_func, int>);
+  static_assert(chainable_func<detail::null_monadic_func, int>);
   static_assert(pure_func<detail::null_pure_func, int>);
   static_assert(mappable<detail::null_pure_func, detail::null_monad<int>>);
 
@@ -101,7 +102,7 @@ namespace fho
     /// @param binder Monadic function to transform the computed value.
     /// @return A lambda (morphism) that applies `comp`, passes its result to `binder`,
     ///         and unwraps the monadic result, returning `binder(comp()).value()`.
-    template<pure_func Compute, monadic_func<std::invoke_result_t<Compute>> Bind>
+    template<pure_func Compute, chainable_func<std::invoke_result_t<Compute>> Bind>
     constexpr auto
     operator()(Compute&& comp, Bind&& binder) const
     {
@@ -154,12 +155,11 @@ namespace fho
       return M(std::move(l));
     }
 
-    /// @brief Chains a monad-producing function to the monad’s value (Monad operation,
-    //         `>>=` in Haskell).
-    /// @tparam F Function type taking value_type and returning a new monad.
-    /// @param f The function to chain, producing a new monad from the value.
+    /// @brief Chains a function to the monad’s value (Monad operation `>>=` in Haskell).
+    /// @tparam F Function type taking value_type and returning a new monad or a callable.
+    /// @param f The function to chain, producing a new monad or callable from the value.
     /// @return A new monad with the chained computation.
-    template<monadic_func<value_type> F>
+    template<chainable_func<value_type> F>
     [[nodiscard]] constexpr auto
     bind(F f) const
     {
