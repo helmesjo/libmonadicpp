@@ -113,20 +113,22 @@ namespace fho
   };
 
   /// @brief A monad class for functional programming in C++.
-  /// @details Wraps a computation (function) and supports operations like mapping and binding,
-  /// using a morphism to transform results.
+  /// @details Encapsulates a computation that produces a value of type T, enabling functional
+  /// operations like mapping (Functor), application (Applicative), and chaining (Monad).
+  /// The Morphism template parameter defines how computations are composed.
+  /// Sig is an optional type for debugging, representing the computation's signature.
   template<typename Morphism, typename T, invocable_r<T> Func,
            typename Sig = detail::signature_t<Func>>
   class monad
   {
   public:
-    using value_type   = T;
-    using compute_type = Func;
+    using value_type   = T;                      ///< Type of the value produced by the computation.
+    using compute_type = Func;                   ///< Type of the computation function.
 
-    static constexpr auto morphism = Morphism{};
+    static constexpr auto morphism = Morphism{}; ///< Morphism instance for composing computations.
 
     /// @brief Constructs a monad with a computation function.
-    /// @param func The function producing the monad's value.
+    /// @param func The computation function that produces a value of type T.
     constexpr explicit monad(Func func)
       : comp_(std::move(func))
     {}
@@ -137,9 +139,11 @@ namespace fho
     constexpr auto operator=(monad const&) -> monad& = default;
     constexpr auto operator=(monad&&) -> monad&      = default;
 
-    /// @brief Applies a function to the monad’s value, returning a new monad.
-    /// @param f Function to transform the value.
-    /// @return New monad with the transformed result.
+    /// @brief Maps a function over the monad’s value (Functor operation, `<$>`
+    ///        in Haskell).
+    /// @tparam F Pure function type taking value_type and returning a new value.
+    /// @param f The function to apply to the monad's value.
+    /// @return A new monad containing the computation composed with f.
     template<pure_func<value_type> F>
     [[nodiscard]] constexpr auto
     fmap(F f) const
@@ -150,9 +154,11 @@ namespace fho
       return M(std::move(l));
     }
 
-    /// @brief Chains a monad-producing function to the monad’s value.
-    /// @param f Function that takes the value and returns a new monad.
-    /// @return New monad with the chained result.
+    /// @brief Chains a monad-producing function to the monad’s value (Monad operation,
+    //         `>>=` in Haskell).
+    /// @tparam F Function type taking value_type and returning a new monad.
+    /// @param f The function to chain, producing a new monad from the value.
+    /// @return A new monad with the chained computation.
     template<monadic_func<value_type> F>
     [[nodiscard]] constexpr auto
     bind(F f) const
@@ -164,9 +170,10 @@ namespace fho
       return M(std::move(l));
     }
 
-    /// @brief Applies a function wrapped in a monad to the monad's value (`<*>` in Haskell).
-    /// @tparam MF The monad type containing the function.
-    /// @param mf The monad containing the function to apply.
+    /// @brief Applies a function wrapped in a monad to this monad's value (Applicative
+    ///         operation, `<*>` in Haskell).
+    /// @tparam MF The monad type containing the function to apply.
+    /// @param mf The monad containing a function to apply to this monad's value.
     /// @return A new monad with the result of applying the function.
     template<monadic MF>
     [[nodiscard]] constexpr auto
@@ -180,8 +187,8 @@ namespace fho
         });
     }
 
-    /// @brief Extracts the monad’s value by running the computation.
-    /// @return The computed value.
+    /// @brief Extracts the monad’s value by executing the computation.
+    /// @return The computed value of type value_type.
     [[nodiscard]] constexpr auto
     value() const -> value_type
     {
@@ -189,7 +196,7 @@ namespace fho
     }
 
   private:
-    compute_type comp_;
+    compute_type comp_; ///< The computation function producing the value.
   };
 
   /// @brief Creates a monad from a function.
