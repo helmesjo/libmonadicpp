@@ -1,77 +1,20 @@
 #pragma once
 
-#include <monadicpp/monad_traits.hxx>
+#include <monadicpp/concepts.hxx>
+#include <monadicpp/traits.hxx>
 #include <monadicpp/detail/func_traits.hxx>
 
-#include <functional>
 #include <utility>
 
 #define FWD(...) ::std::forward<decltype(__VA_ARGS__)>(__VA_ARGS__)
 
 namespace fho
 {
-  /// @brief Concept for monadic types.
-  /// @details Ensures a type has a value type, supports map and bind operations, and provides a
-  /// value extraction method.
-  template<typename T>
-  concept monadic = requires (T t) {
-                      typename std::remove_cvref_t<T>::value_type;
-                      t.fmap(std::declval<detail::null_pure_func>());
-                      t.bind(std::declval<detail::null_monadic_func>());
-                      {
-                        t.value()
-                      } -> std::convertible_to<typename std::remove_cvref_t<T>::value_type>;
-                    };
-
-  /// @brief Concept for functor types.
-  /// @details Checks if a type supports map operation returning a monadic type.
-  template<typename T>
-  concept functor = requires (T t) {
-                      { t.fmap(std::declval<detail::null_pure_func>()) } -> monadic;
-                    };
-
-  /// @concept chainable_func
-  /// @brief Checks if a type is invocable and its result is either monadic or another callable.
-  /// Used for functions in monadic chaining (bind) or partial application (ap).
-  template<typename T, typename... Args>
-  concept chainable_func =
-    std::invocable<T, Args...> &&
-    (monadic<std::invoke_result_t<T, Args...>> || std::invocable<std::invoke_result_t<T, Args...>>);
-
-  /// @brief Concept for pure functions.
-  /// @details Ensures a function is invocable and does not return a monadic type.
-  template<typename T, typename... Args>
-  concept pure_func = std::invocable<T, Args...> && (!monadic<std::invoke_result_t<T, Args...>>);
-
-  /// @brief Concept for invocable types with specific return type.
-  /// @details Checks if a function, when invoked, returns a type convertible to the specified
-  /// return type.
-  template<typename T, typename R, typename... Args>
-  concept invocable_r = requires (T&& t, Args&&... args) {
-                          { std::invoke(t, std::forward<Args>(args)...) } -> std::convertible_to<R>;
-                        };
-
-  template<typename F, typename M>
-  concept mappable = functor<M> && pure_func<F, typename std::remove_cvref_t<M>::value_type>;
-
-  template<typename F, typename M>
-  concept bindable = monadic<M> && chainable_func<F, typename std::remove_cvref_t<M>::value_type>;
-
-  template<typename MF, typename M>
-  concept applicative = functor<MF> && mappable<M, typename std::remove_cvref_t<MF>::value_type>;
-
-  static_assert(monadic<detail::null_monad<int>>);
-  static_assert(functor<detail::null_monad<int>>);
-  static_assert(functor<detail::null_functor<int>>);
-  static_assert(chainable_func<detail::null_monadic_func, int>);
-  static_assert(pure_func<detail::null_pure_func, int>);
-  static_assert(mappable<detail::null_pure_func, detail::null_monad<int>>);
-
   /// @struct compose
   /// @brief Constructs a morphism by composing a computation and a binding function.
   ///
-  /// Combines a pure computation and a binding function into a new pure function (morphism).
-  /// Provides overloads for pure and monadic bindings.
+  /// @details Combines a pure computation and a binding function into a new pure
+  ///          function (morphism). Provides overloads for pure and monadic bindings.
   struct compose
   {
     /// @brief Composes a pure computation with a pure binding function.
@@ -155,7 +98,7 @@ namespace fho
       return M(std::move(l));
     }
 
-    /// @brief Chains a function to the monad’s value (Monad operation `>>=` in Haskell).
+    /// @brief Chains a function to the monad’s value (Monad operation, `>>=` in Haskell).
     /// @tparam F Function type taking value_type and returning a new monad or a callable.
     /// @param f The function to chain, producing a new monad or callable from the value.
     /// @return A new monad with the chained computation.
@@ -171,7 +114,7 @@ namespace fho
     }
 
     /// @brief Applies a function wrapped in a monad to this monad's value (Applicative
-    ///         operation, `<*>` in Haskell).
+    ///        operation, `<*>` in Haskell).
     /// @tparam MF The monad type containing the function to apply.
     /// @param mf The monad containing a function to apply to this monad's value.
     /// @return A new monad with the result of applying the function.
@@ -188,7 +131,7 @@ namespace fho
     }
 
     /// @brief Extracts the monad’s value by executing the computation.
-    /// @return The computed value of type value_type.
+    /// @return The computed value of type `value_type`.
     [[nodiscard]] constexpr auto
     value() const -> value_type
     {
