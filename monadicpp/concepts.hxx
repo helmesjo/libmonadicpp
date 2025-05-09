@@ -1,3 +1,5 @@
+#pragma once
+
 #include <monadicpp/traits.hxx>
 
 #include <concepts>
@@ -61,6 +63,16 @@ namespace fho
     };
   }
 
+  template<template<typename, typename> typename Concept, typename LPack, typename RPack,
+           size_t I = 0>
+  concept pairwise = detail::check_pairwise_recursive<Concept, LPack, RPack, I>();
+
+  static_assert(pairwise<std::is_same, std::tuple<int, float>, std::tuple<int>>);
+  static_assert(pairwise<std::is_same, std::tuple<int, float>, std::tuple<int, float>>);
+  static_assert(!pairwise<std::is_same, std::tuple<float, float>, std::tuple<int>>);
+  static_assert(pairwise<std::is_convertible, std::tuple<int, float>, std::tuple<float>>);
+  static_assert(pairwise<std::is_convertible, std::tuple<float>, std::tuple<int, float>>);
+
   /// @brief Concept for monadic types.
   /// @details Ensures a type has a value type, supports map and bind operations, and provides a
   /// value extraction method.
@@ -89,16 +101,17 @@ namespace fho
   /// @brief Checks if a type is invocable and its result is either monadic or another callable.
   ///        Used for functions in monadic chaining (bind) or partial application (ap).
   template<typename T, typename... Args>
-  concept chainable_func =
-    std::invocable<T, Args...> &&
-    (monadic<std::invoke_result_t<T, Args...>> || std::invocable<std::invoke_result_t<T, Args...>>);
+  concept chainable_func = requires {
+                             { std::declval<T>()(std::declval<Args>()...) } -> monadic;
+                           };
 
   /// @brief Concept for pure functions.
   /// @details Ensures a function is invocable with `Args...` and does not return a monadic type.
   template<typename T, typename... Args>
-  concept pure_func = requires {
-                        { std::declval<T>()(std::declval<Args>()...) } -> not_monadic;
-                      };
+  concept pure_func =
+    chainable_func<T, Args...> || requires {
+                                    { std::declval<T const>()(std::declval<Args>()...) };
+                                  };
 
   /// @brief Concept for invocable types with specific return type.
   /// @details Checks if a function, when invoked, returns a type convertible to the specified

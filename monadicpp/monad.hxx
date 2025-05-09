@@ -1,5 +1,6 @@
 #pragma once
 
+#include <monadicpp/applicative.hxx>
 #include <monadicpp/concepts.hxx>
 #include <monadicpp/traits.hxx>
 #include <monadicpp/detail/func_traits.hxx>
@@ -168,7 +169,7 @@ namespace fho
     return monad<Morphism, T, decltype(f), detail::signature_t<decltype(f)>>{std::move(f)};
   }
 
-  /// @brief Maps a pure function over a functor (fmap in Haskell).
+  /// @brief Maps a pure function over a functor (`fmap` in Haskell).
   /// @tparam F The type of the pure function.
   /// @tparam M The functor/monad type.
   /// @param f The pure function to apply.
@@ -181,7 +182,7 @@ namespace fho
     return FWD(m).fmap(FWD(f));
   }
 
-  /// @brief Binds a monadic function to a monad (>>= in Haskell).
+  /// @brief Binds a monadic function to a monad (`>>=` in Haskell).
   /// @tparam F The type of the monadic function.
   /// @tparam M The monad type.
   /// @param m The monad to bind.
@@ -194,7 +195,7 @@ namespace fho
     return FWD(m).bind(FWD(f));
   }
 
-  /// @brief Applies a function wrapped in a monad to a value wrapped in a monad (<*> in Haskell).
+  /// @brief Applies a function wrapped in a monad to a value wrapped in a monad (`<*>` in Haskell).
   /// @tparam MF The monad type containing the function.
   /// @tparam M The monad type containing the value.
   /// @param mf The monad containing the function.
@@ -211,7 +212,7 @@ namespace fho
   /// @details Ensures the monad implementation satisfies left identity, right identity,
   /// associativity, and functor laws.
 
-  /// @brief Left Identity Law: pure(x) >>= f == f(x).
+  /// @brief Left Identity Law: `pure(x) >>= f == f(x)`.
   /// @details Checks that wrapping a value and binding it to a function yields the same result as
   /// applying the function directly.
   static_assert(
@@ -225,7 +226,7 @@ namespace fho
       return pure(x).bind(f).value() == f(x).value();
     }());
 
-  /// @brief Right Identity Law: m >>= pure == m.
+  /// @brief Right Identity Law: `m >>= pure == m`.
   /// @details Verifies that binding a monad to the pure function returns the original monad.
   static_assert(
     []
@@ -238,7 +239,7 @@ namespace fho
       return m.bind(f).value() == m.value();
     }());
 
-  /// @brief Associativity Law: (m >>= f) >>= g == m >>= (x -> f(x) >>= g).
+  /// @brief Associativity Law: `(m >>= f) >>= g == m >>= (x -> f(x) >>= g)`.
   /// @details Ensures that chaining monad operations is consistent regardless of grouping.
   static_assert(
     []
@@ -261,7 +262,7 @@ namespace fho
       return lhs.value() == rhs.value();
     }());
 
-  /// @brief Functor Identity Law: fmap id == id.
+  /// @brief Functor Identity Law: `fmap id == id`.
   /// @details Confirms that mapping the identity function over a monad leaves it unchanged.
   static_assert(
     []
@@ -274,7 +275,7 @@ namespace fho
       return m.fmap(id).value() == m.value();
     }());
 
-  /// @brief Functor Composition Law: fmap (f . g) == fmap f . fmap g.
+  /// @brief Functor Composition Law: `fmap (f ∘ g) == fmap f ∘ fmap g`.
   /// @details Verifies that mapping a composed function is equivalent to mapping functions
   /// sequentially.
   static_assert(
