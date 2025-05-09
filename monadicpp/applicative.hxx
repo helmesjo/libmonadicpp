@@ -30,7 +30,7 @@ namespace fho
   ///
   /// The process works as follows:
   /// 1. It checks if `f` is invocable with the provided `args` using `std::invocable`. If true, it
-  /// returns a zero-parameter callable wrapping the invocation `f` with `args`, forwarded with
+  /// returns a zero-parameter callable wrapping the invocation `f(args...)`, forwarded with
   /// `std::forward` (aliased as `FWD` for brevity) to preserve their value category.
   /// 2. If `f` cannot be invoked yet (i.e., more arguments are needed), it captures `FWD(f)` and
   /// `FWD(args)` in a lambda that accepts additional arguments (`As...`) and recursively calls
@@ -49,24 +49,24 @@ namespace fho
   constexpr auto
   curry(F&& f, Args&&... args) -> decltype(auto)
   {
-    using sig_t = detail::function_signature_t<std::remove_reference_t<F>>;
-
-    static constexpr auto f_arg_count = detail::function_arg_count<sig_t>;
-
     /// 1.
     if constexpr (std::invocable<F, Args...>)
     {
-      return std::bind_front(FWD(f), FWD(args)...);
+      return [f        = FWD(f),
+              ... args = FWD(args)]<typename Self, typename... As>(this Self&&) -> decltype(auto)
+      {
+        return std::forward_like<Self>(f)(std::forward_like<Self>(args)...);
+      };
     }
     /// 2.
     else
     {
-      static_assert(f_arg_count > 0);
+      static_assert(detail::function_arg_count<F> > 0);
       return [f        = FWD(f),
               ... args = FWD(args)]<typename Self, typename... As>(this Self&&,
                                                                    As&&... as) -> decltype(auto)
              /// 3. Aligns comparison with `detail::match_any` (always true).
-               requires (sizeof...(As) > 0 && sizeof...(As) <= f_arg_count) &&
+               requires (sizeof...(As) > 0 && (sizeof...(As) <= detail::function_arg_count<F>)) &&
                         pairwise<std::is_convertible, std::tuple<Args...>,
                                  std::tuple<detail::match_any, As...>>
 

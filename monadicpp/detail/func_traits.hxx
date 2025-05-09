@@ -100,7 +100,8 @@ namespace fho::detail
   using function_arg_type_t = typename function_signature<T>::template arg_type_t<I>;
 
   template<typename T>
-  static constexpr auto function_arg_count = function_signature<T>::arg_count;
+  static constexpr auto function_arg_count =
+    function_signature<std::remove_reference_t<T>>::arg_count;
 
   /// @brief TEST: Function Signature
   static_assert(
