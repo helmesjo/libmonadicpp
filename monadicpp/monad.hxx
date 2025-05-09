@@ -95,7 +95,7 @@ namespace fho
     {
       auto l  = morphism(comp_, f);
       using U = std::invoke_result_t<F, value_type>;
-      using M = monad<Morphism, U, decltype(l), detail::signature_t<decltype(l), Sig>>;
+      using M = monad<Morphism, U, decltype(l), detail::signature_t<Sig, decltype(l)>>;
       return M(std::move(l));
     }
 
@@ -110,7 +110,7 @@ namespace fho
       auto l  = morphism(comp_, f);
       using U = std::invoke_result_t<F, value_type>;
       using V = typename U::value_type;
-      using M = monad<Morphism, V, decltype(l), detail::signature_t<decltype(l), Sig>>;
+      using M = monad<Morphism, V, decltype(l), detail::signature_t<Sig, decltype(l)>>;
       return M(std::move(l));
     }
 

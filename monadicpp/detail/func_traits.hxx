@@ -5,8 +5,19 @@
 
 namespace fho::detail
 {
+  /// @breif  Specialization for callables (lambdas, functors, ...).
   template<typename T>
-  struct function_signature;
+  struct function_signature
+  {
+    /// @breif  Extract `operator()` signature.
+    using type = typename function_signature<decltype(&T::operator())>::type;
+
+    template<auto I>
+    using arg_type_t =
+      typename function_signature<decltype(&T::operator())>::template arg_type_t<I>;
+
+    static constexpr auto arg_count = function_signature<decltype(&T::operator())>::arg_count;
+  };
 
   /// @breif Specialization for function pointers.
   template<typename R, typename... Args>
@@ -76,20 +87,6 @@ namespace fho::detail
     using arg_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
 
     static constexpr auto arg_count = sizeof...(Args);
-  };
-
-  /// @breif  Specialization for callables (lambdas, functors, ...).
-  template<typename T>
-  struct function_signature
-  {
-    /// @breif  Extract `operator()` signature.
-    using type = typename function_signature<decltype(&T::operator())>::type;
-
-    template<auto I>
-    using arg_type_t =
-      typename function_signature<decltype(&T::operator())>::template arg_type_t<I>;
-
-    static constexpr auto arg_count = function_signature<decltype(&T::operator())>::arg_count;
   };
 
   /// @breif Type trait to extract a types function signature.

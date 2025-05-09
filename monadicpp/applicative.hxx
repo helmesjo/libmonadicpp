@@ -4,7 +4,6 @@
 #include <monadicpp/detail/func_traits.hxx>
 
 #include <concepts>
-#include <functional>
 #include <type_traits>
 #include <utility>
 
