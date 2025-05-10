@@ -58,23 +58,23 @@ namespace fho
   };
 
   /// @brief A monad class for functional programming in C++.
-  /// @details Encapsulates a computation that produces a value of type T, enabling functional
-  /// operations like mapping (Functor), application (Applicative), and chaining (Monad).
-  /// The Morphism template parameter defines how computations are composed.
-  /// Sig is an optional type for debugging, representing the computation's signature.
-  template<typename Morphism, typename T, invocable_r<T> Func,
-           typename Sig = detail::signature_t<Func>>
+  /// @details Encapsulates a computation `Comp` that produces a value of type `T`, enabling
+  /// functional operations like mapping (Functor), application (Applicative), and chaining (Monad).
+  /// The `Morphism` template parameter defines how computations are composed.
+  /// `Sig` is an optional type for debugging, representing the (composed) computation's signature.
+  template<typename Morphism, typename T, invocable_r<T> Comp,
+           typename Sig = detail::signature_t<Comp>>
   class monad
   {
   public:
     using value_type   = T;                      ///< Type of the value produced by the computation.
-    using compute_type = Func;                   ///< Type of the computation function.
+    using compute_type = Comp;                   ///< Type of the computation function.
 
     static constexpr auto morphism = Morphism{}; ///< Morphism instance for composing computations.
 
     /// @brief Constructs a monad with a computation function.
     /// @param func The computation function that produces a value of type T.
-    constexpr explicit monad(Func func)
+    constexpr explicit monad(Comp func)
       : comp_(std::move(func))
     {}
 
@@ -84,9 +84,9 @@ namespace fho
     constexpr auto operator=(monad const&) -> monad& = default;
     constexpr auto operator=(monad&&) -> monad&      = default;
 
-    /// @brief Maps a function over the monad’s value (Functor operation, `<$>`
-    ///        in Haskell).
-    /// @tparam F Pure function type taking value_type and returning a new value.
+    /// @brief Maps a function over the monad’s value (`<$>` in Haskell).
+    /// @tparam F Pure function (`mappable<F, monad>`) type taking `value_type` and returning a new
+    /// value.
     /// @param f The function to apply to the monad's value.
     /// @return A new monad containing the computation composed with f.
     template<mappable<monad> F>
@@ -102,8 +102,9 @@ namespace fho
       return M(std::move(l));
     }
 
-    /// @brief Chains a function to the monad’s value (Monad operation, `>>=` in Haskell).
-    /// @tparam F Function type taking value_type and returning a new monad or a callable.
+    /// @brief Chains a function to the monad’s value (`>>=` in Haskell).
+    /// @tparam F Function (`bindable<F, monad>`) type taking `value_type` and returning a new monad
+    /// or a callable.
     /// @param f The function to chain, producing a new monad or callable from the value.
     /// @return A new monad with the chained computation.
     template<bindable<monad> F>
@@ -120,9 +121,8 @@ namespace fho
       return M(std::move(l));
     }
 
-    /// @brief Applies a function wrapped in a monad to this monad's value (Applicative
-    ///        operation, `<*>` in Haskell).
-    /// @tparam MF The monad type containing the function to apply.
+    /// @brief Applies a function wrapped in a monad to this monad's value (`<*>` in Haskell).
+    /// @tparam MF The monad type (`monadic`) containing the function to apply.
     /// @param mf The monad containing a function to apply to this monad's value.
     /// @return A new monad with the result of applying the function.
     template<monadic MF>
@@ -175,7 +175,7 @@ namespace fho
     return monad<Morphism, T, decltype(f), detail::signature_t<decltype(f)>>{std::move(f)};
   }
 
-  /// @brief Maps a pure function over a functor (`fmap` in Haskell).
+  /// @brief Maps a pure function over a functor (`<$>` in Haskell).
   /// @tparam F The type of the pure function.
   /// @tparam M The functor/monad type.
   /// @param f The pure function to apply.
