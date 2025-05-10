@@ -5,12 +5,13 @@
 
 namespace fho::detail
 {
-  /// @breif  Specialization for callables (lambdas, functors, ...).
+  /// @breif Primary Template. Specialization for callables (lambdas, functors, ...).
   template<typename T>
   struct function_signature
   {
     /// @breif  Extract `operator()` signature.
-    using type = typename function_signature<decltype(&T::operator())>::type;
+    using type          = typename function_signature<decltype(&T::operator())>::type;
+    using arg_pack_type = typename function_signature<decltype(&T::operator())>::arg_pack_type;
 
     template<auto I>
     using arg_type_t =
@@ -23,7 +24,8 @@ namespace fho::detail
   template<typename R, typename... Args>
   struct function_signature<R (*)(Args...)>
   {
-    using type = R(Args...);
+    using type          = R(Args...);
+    using arg_pack_type = std::tuple<Args...>;
 
     template<auto I>
     using arg_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
@@ -31,10 +33,12 @@ namespace fho::detail
     static constexpr auto arg_count = sizeof...(Args);
   };
 
+  /// @breif Specialization for function types.
   template<typename R, typename... Args>
   struct function_signature<R(Args...)>
   {
-    using type = R(Args...);
+    using type          = R(Args...);
+    using arg_pack_type = std::tuple<Args...>;
 
     template<auto I>
     using arg_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
@@ -42,10 +46,12 @@ namespace fho::detail
     static constexpr auto arg_count = sizeof...(Args);
   };
 
+  /// @breif Specialization for `const` function types.
   template<typename R, typename... Args>
   struct function_signature<R(Args...) const>
   {
-    using type = R(Args...);
+    using type          = R(Args...);
+    using arg_pack_type = std::tuple<Args...>;
 
     template<auto I>
     using arg_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
@@ -57,7 +63,8 @@ namespace fho::detail
   template<typename Class, typename R, typename... Args>
   struct function_signature<R (Class::*)(Args...)>
   {
-    using type = R(Args...);
+    using type          = R(Args...);
+    using arg_pack_type = std::tuple<Args...>;
 
     template<auto I>
     using arg_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
@@ -65,11 +72,12 @@ namespace fho::detail
     static constexpr auto arg_count = sizeof...(Args);
   };
 
-  /// @breif  Specialization for member functions (e.g., `operator()` in functors).
+  /// @breif  Specialization for `const` member functions (e.g., `operator()` in functors).
   template<typename Class, typename R, typename... Args>
   struct function_signature<R (Class::*)(Args...) const>
   {
-    using type = R(Args...) const;
+    using type          = R(Args...) const;
+    using arg_pack_type = std::tuple<Args...>;
 
     template<auto I>
     using arg_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
@@ -81,7 +89,8 @@ namespace fho::detail
   template<typename R, typename... Args>
   struct function_signature<std::function<R(Args...)>>
   {
-    using type = R(Args...);
+    using type          = R(Args...);
+    using arg_pack_type = std::tuple<Args...>;
 
     template<auto I>
     using arg_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
@@ -92,6 +101,9 @@ namespace fho::detail
   /// @breif Type trait to extract a types function signature.
   template<typename T>
   using function_signature_t = typename function_signature<T>::type;
+
+  template<typename T>
+  using function_arg_pack_type_t = typename function_signature<T>::arg_pack_type;
 
   template<typename T, auto I>
   using function_arg_type_t = typename function_signature<T>::template arg_type_t<I>;
@@ -126,8 +138,36 @@ namespace fho::detail
     []
     {
       using func_t = function_signature_t<int (*)(int, float const&, double)>;
-      // TODO: Figure out why both of these work
       return std::same_as<int(int, float const&, double), function_signature_t<func_t>>;
+    }());
+
+  /// @brief TEST: Argument pack
+  static_assert(
+    []
+    {
+      using func_t = int (*)(int, float const&, double);
+      return std::same_as<std::tuple<int, float const&, double>, function_arg_pack_type_t<func_t>>;
+    }());
+
+  static_assert(
+    []
+    {
+      using func_t = decltype([](int, float const&, double) -> int{ return 1; });
+      return std::same_as<std::tuple<int, float const&, double>, function_arg_pack_type_t<func_t>>;
+    }());
+
+  static_assert(
+    []
+    {
+      using func_t = std::function<int(int, float const&, double)>;
+      return std::same_as<std::tuple<int, float const&, double>, function_arg_pack_type_t<func_t>>;
+    }());
+
+  static_assert(
+    []
+    {
+      using func_t = function_signature_t<int (*)(int, float const&, double)>;
+      return std::same_as<std::tuple<int, float const&, double>, function_arg_pack_type_t<func_t>>;
     }());
 
   /// @brief TEST: Argument type at index `I`
