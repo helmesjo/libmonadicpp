@@ -27,15 +27,15 @@ namespace fho
     /// @param binder Pure function to transform the computed value.
     /// @return A lambda (morphism) that applies `comp` and passes its result to `binder`,
     ///         returning `binder(comp())`.
-    template<pure_func Compute, pure_func<std::invoke_result_t<Compute>> Bind>
-    constexpr auto
-    operator()(Compute&& comp, Bind&& binder) const
-    {
-      return [c = FWD(comp), b = FWD(binder)]()
-      {
-        return b(std::forward<Compute>(c)());
-      };
-    }
+    // template<pure_func Compute, std::invocable<std::invoke_result_t<Compute>> Bind>
+    // constexpr auto
+    // operator()(Compute&& comp, Bind&& binder) const
+    // {
+    //   return [c = FWD(comp), b = FWD(binder)]()
+    //   {
+    //     return b(std::forward<Compute>(c)());
+    //   };
+    // }
 
     /// @brief Composes a pure computation with a monadic binding function.
     ///
@@ -46,15 +46,15 @@ namespace fho
     /// @param binder Monadic function to transform the computed value.
     /// @return A lambda (morphism) that applies `comp`, passes its result to `binder`,
     ///         and unwraps the monadic result, returning `binder(comp()).value()`.
-    template<pure_func Compute, chainable_func<std::invoke_result_t<Compute>> Bind>
-    constexpr auto
-    operator()(Compute&& comp, Bind&& binder) const
-    {
-      return [c = FWD(comp), b = FWD(binder)]()
-      {
-        return b(std::forward<Compute>(c)()).value();
-      };
-    }
+    // template<pure_func Compute, bindable<std::invoke_result_t<Compute>> Bind>
+    // constexpr auto
+    // operator()(Compute&& comp, Bind&& binder) const
+    // {
+    //   return [c = FWD(comp), b = FWD(binder)]()
+    //   {
+    //     return b(std::forward<Compute>(c)()).value();
+    //   };
+    // }
   };
 
   /// @brief A monad class for functional programming in C++.
@@ -89,11 +89,14 @@ namespace fho
     /// @tparam F Pure function type taking value_type and returning a new value.
     /// @param f The function to apply to the monad's value.
     /// @return A new monad containing the computation composed with f.
-    template<pure_func<value_type> F>
+    template<mappable<monad> F>
     [[nodiscard]] constexpr auto
     fmap(F f) const
     {
-      auto l  = morphism(comp_, f);
+      auto l = [c = comp_, b = FWD(f)] -> decltype(auto)
+      {
+        return b(std::forward_like<compute_type>(c)());
+      };
       using U = std::invoke_result_t<F, value_type>;
       using M = monad<Morphism, U, decltype(l), detail::signature_t<Sig, decltype(l)>>;
       return M(std::move(l));
@@ -103,11 +106,14 @@ namespace fho
     /// @tparam F Function type taking value_type and returning a new monad or a callable.
     /// @param f The function to chain, producing a new monad or callable from the value.
     /// @return A new monad with the chained computation.
-    template<chainable_func<value_type> F>
+    template<bindable<monad> F>
     [[nodiscard]] constexpr auto
     bind(F f) const
     {
-      auto l  = morphism(comp_, f);
+      auto l = [c = comp_, b = FWD(f)] -> decltype(auto)
+      {
+        return b(std::forward_like<compute_type>(c)()).value();
+      };
       using U = std::invoke_result_t<F, value_type>;
       using V = typename U::value_type;
       using M = monad<Morphism, V, decltype(l), detail::signature_t<Sig, decltype(l)>>;
@@ -183,8 +189,6 @@ namespace fho
   }
 
   /// @brief Binds a monadic function to a monad (`>>=` in Haskell).
-  /// @tparam F The type of the monadic function.
-  /// @tparam M The monad type.
   /// @param m The monad to bind.
   /// @param f The monadic function to apply.
   /// @return A new monad with the result of the monadic function.
@@ -196,8 +200,6 @@ namespace fho
   }
 
   /// @brief Applies a function wrapped in a monad to a value wrapped in a monad (`<*>` in Haskell).
-  /// @tparam MF The monad type containing the function.
-  /// @tparam M The monad type containing the value.
   /// @param mf The monad containing the function.
   /// @param m The monad containing the value.
   /// @return A new monad with the result of applying the function to the value.
