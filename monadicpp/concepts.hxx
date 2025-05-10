@@ -86,6 +86,38 @@ namespace fho
         return {};
       }
     };
+
+    // @brief Type used in `pairwise` matcher to always equal true.
+    struct match_any
+    {};
+
+    // @brief Recursively applies `Trait` to pack types from `0` to `min(sizeof...(LPack),
+    // sizeof...(RPack))`. Type `match_any` in either `LPack[I]` and/or `RPack[I]` is considered a
+    // match.
+    template<template<typename, typename> typename Trait, typename LPack, typename RPack,
+             size_t I = 0, size_t N = std::min(std::tuple_size_v<LPack>, std::tuple_size_v<RPack>)>
+    constexpr auto
+    check_pairwise_recursive() -> bool
+    {
+      if constexpr (I == N)
+      {
+        return true; // Base case: reached the end
+      }
+      else
+      {
+        using lhs_t = std::tuple_element_t<I, LPack>;
+        using rhs_t = std::tuple_element_t<I, RPack>;
+        if constexpr (std::same_as<match_any, lhs_t> || std::same_as<match_any, rhs_t>)
+        {
+          return check_pairwise_recursive<Trait, LPack, RPack, I + 1, N>();
+        }
+        else
+        {
+          return Trait<lhs_t, rhs_t>::value &&
+                 check_pairwise_recursive<Trait, LPack, RPack, I + 1, N>();
+        }
+      }
+    }
   }
 
   template<template<typename, typename> typename Concept, typename LPack, typename RPack,

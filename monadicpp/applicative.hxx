@@ -55,12 +55,12 @@ namespace fho
     /// 2.
     else
     {
-      static_assert(detail::function_arg_count<F> > 0);
+      static_assert(detail::arity<F> > 0);
       return [f        = FWD(f),
               ... args = FWD(args)]<typename Self, typename... As>(this Self&&,
                                                                    As&&... as) -> decltype(auto)
              /// 3. Aligns comparison with `detail::match_any` (always true).
-               requires (sizeof...(As) > 0 && (sizeof...(As) <= detail::function_arg_count<F>)) &&
+               requires (sizeof...(As) > 0 && (sizeof...(As) <= detail::arity<F>)) &&
                         pairwise<std::is_convertible, std::tuple<Args...>,
                                  std::tuple<detail::match_any, As...>>
 

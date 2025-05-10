@@ -10,107 +10,109 @@ namespace fho::detail
   struct function_signature
   {
     /// @breif  Extract `operator()` signature.
-    using type          = typename function_signature<decltype(&T::operator())>::type;
-    using arg_pack_type = typename function_signature<decltype(&T::operator())>::arg_pack_type;
+    using type           = typename function_signature<decltype(&T::operator())>::type;
+    using argument_types = typename function_signature<decltype(&T::operator())>::argument_types;
 
     template<auto I>
-    using arg_type_t =
-      typename function_signature<decltype(&T::operator())>::template arg_type_t<I>;
+    using argument_type_t =
+      typename function_signature<decltype(&T::operator())>::template argument_type_t<I>;
 
-    static constexpr auto arg_count = function_signature<decltype(&T::operator())>::arg_count;
+    static constexpr auto arity = function_signature<decltype(&T::operator())>::arity;
   };
 
   /// @breif Specialization for function pointers.
   template<typename R, typename... Args>
   struct function_signature<R (*)(Args...)>
   {
-    using type          = R(Args...);
-    using arg_pack_type = std::tuple<Args...>;
+    using type           = R(Args...);
+    using argument_types = std::tuple<Args...>;
 
     template<auto I>
-    using arg_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
+    using argument_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
 
-    static constexpr auto arg_count = sizeof...(Args);
+    static constexpr auto arity = sizeof...(Args);
   };
 
   /// @breif Specialization for function types.
   template<typename R, typename... Args>
   struct function_signature<R(Args...)>
   {
-    using type          = R(Args...);
-    using arg_pack_type = std::tuple<Args...>;
+    using type           = R(Args...);
+    using argument_types = std::tuple<Args...>;
 
     template<auto I>
-    using arg_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
+    using argument_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
 
-    static constexpr auto arg_count = sizeof...(Args);
+    static constexpr auto arity = sizeof...(Args);
   };
 
   /// @breif Specialization for `const` function types.
   template<typename R, typename... Args>
   struct function_signature<R(Args...) const>
   {
-    using type          = R(Args...);
-    using arg_pack_type = std::tuple<Args...>;
+    using type           = R(Args...);
+    using argument_types = std::tuple<Args...>;
 
     template<auto I>
-    using arg_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
+    using argument_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
 
-    static constexpr auto arg_count = sizeof...(Args);
+    static constexpr auto arity = sizeof...(Args);
   };
 
   /// @breif  Specialization for member functions (e.g., `operator()` in functors).
   template<typename Class, typename R, typename... Args>
   struct function_signature<R (Class::*)(Args...)>
   {
-    using type          = R(Args...);
-    using arg_pack_type = std::tuple<Args...>;
+    using type           = R(Args...);
+    using argument_types = std::tuple<Args...>;
 
     template<auto I>
-    using arg_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
+    using argument_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
 
-    static constexpr auto arg_count = sizeof...(Args);
+    static constexpr auto arity = sizeof...(Args);
   };
 
   /// @breif  Specialization for `const` member functions (e.g., `operator()` in functors).
   template<typename Class, typename R, typename... Args>
   struct function_signature<R (Class::*)(Args...) const>
   {
-    using type          = R(Args...) const;
-    using arg_pack_type = std::tuple<Args...>;
+    using type           = R(Args...) const;
+    using argument_types = std::tuple<Args...>;
 
     template<auto I>
-    using arg_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
+    using argument_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
 
-    static constexpr auto arg_count = sizeof...(Args);
+    static constexpr auto arity = sizeof...(Args);
   };
 
   /// @breif  Specialization for `std::function`.
   template<typename R, typename... Args>
   struct function_signature<std::function<R(Args...)>>
   {
-    using type          = R(Args...);
-    using arg_pack_type = std::tuple<Args...>;
+    using type           = R(Args...);
+    using argument_types = std::tuple<Args...>;
 
     template<auto I>
-    using arg_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
+    using argument_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
 
-    static constexpr auto arg_count = sizeof...(Args);
+    static constexpr auto arity = sizeof...(Args);
   };
 
-  /// @breif Type trait to extract a types function signature.
+  /// @breif Type trait to extract `T` function signature.
   template<typename T>
   using function_signature_t = typename function_signature<T>::type;
 
+  /// @breif Type trait to extract argument types for function `T`.
   template<typename T>
-  using function_arg_pack_type_t = typename function_signature<T>::arg_pack_type;
+  using argument_types_t = typename function_signature<T>::argument_types;
 
+  /// @breif Type trait to extract argument type `I` for function `T`.
   template<typename T, auto I>
-  using function_arg_type_t = typename function_signature<T>::template arg_type_t<I>;
+  using argument_type_t = typename function_signature<T>::template argument_type_t<I>;
 
+  /// @breif Number of arguments for function `T`.
   template<typename T>
-  static constexpr auto function_arg_count =
-    function_signature<std::remove_reference_t<T>>::arg_count;
+  static constexpr auto arity = function_signature<std::remove_reference_t<T>>::arity;
 
   /// @brief TEST: Function Signature
   static_assert(
@@ -146,28 +148,28 @@ namespace fho::detail
     []
     {
       using func_t = int (*)(int, float const&, double);
-      return std::same_as<std::tuple<int, float const&, double>, function_arg_pack_type_t<func_t>>;
+      return std::same_as<std::tuple<int, float const&, double>, argument_types_t<func_t>>;
     }());
 
   static_assert(
     []
     {
       using func_t = decltype([](int, float const&, double) -> int{ return 1; });
-      return std::same_as<std::tuple<int, float const&, double>, function_arg_pack_type_t<func_t>>;
+      return std::same_as<std::tuple<int, float const&, double>, argument_types_t<func_t>>;
     }());
 
   static_assert(
     []
     {
       using func_t = std::function<int(int, float const&, double)>;
-      return std::same_as<std::tuple<int, float const&, double>, function_arg_pack_type_t<func_t>>;
+      return std::same_as<std::tuple<int, float const&, double>, argument_types_t<func_t>>;
     }());
 
   static_assert(
     []
     {
       using func_t = function_signature_t<int (*)(int, float const&, double)>;
-      return std::same_as<std::tuple<int, float const&, double>, function_arg_pack_type_t<func_t>>;
+      return std::same_as<std::tuple<int, float const&, double>, argument_types_t<func_t>>;
     }());
 
   /// @brief TEST: Argument type at index `I`
@@ -175,71 +177,39 @@ namespace fho::detail
     []
     {
       using func_t = int (*)(int, float const&, double);
-      return std::same_as<int, function_arg_type_t<func_t, 0>> &&
-             std::same_as<float const&, function_arg_type_t<func_t, 1>> &&
-             std::same_as<double, function_arg_type_t<func_t, 2>>;
+      return std::same_as<int, argument_type_t<func_t, 0>> &&
+             std::same_as<float const&, argument_type_t<func_t, 1>> &&
+             std::same_as<double, argument_type_t<func_t, 2>>;
     }());
 
   static_assert(
     []
     {
       using func_t = decltype([](int, float const&, double) -> int{ return 1; });
-      return std::same_as<int, function_arg_type_t<func_t, 0>> &&
-             std::same_as<float const&, function_arg_type_t<func_t, 1>> &&
-             std::same_as<double, function_arg_type_t<func_t, 2>>;
+      return std::same_as<int, argument_type_t<func_t, 0>> &&
+             std::same_as<float const&, argument_type_t<func_t, 1>> &&
+             std::same_as<double, argument_type_t<func_t, 2>>;
     }());
 
   static_assert(
     []
     {
       using func_t = std::function<int(int, float const&, double)>;
-      return std::same_as<int, function_arg_type_t<func_t, 0>> &&
-             std::same_as<float const&, function_arg_type_t<func_t, 1>> &&
-             std::same_as<double, function_arg_type_t<func_t, 2>>;
+      return std::same_as<int, argument_type_t<func_t, 0>> &&
+             std::same_as<float const&, argument_type_t<func_t, 1>> &&
+             std::same_as<double, argument_type_t<func_t, 2>>;
     }());
 
   /// @brief TEST: Argument count
-  static_assert(1 == function_arg_count<int (*)(int)>);
-  static_assert(2 == function_arg_count<int (*)(int, float)>);
-  static_assert(3 == function_arg_count<int (*)(int, float, double)>);
+  static_assert(1 == arity<int (*)(int)>);
+  static_assert(2 == arity<int (*)(int, float)>);
+  static_assert(3 == arity<int (*)(int, float, double)>);
 
-  static_assert(1 == function_arg_count<decltype([](int) -> int{ return 1; })>);
-  static_assert(2 == function_arg_count<decltype([](int, float) -> int{ return 1; })>);
-  static_assert(3 == function_arg_count<decltype([](int, float, double) -> int{ return 1; })>);
+  static_assert(1 == arity<decltype([](int) -> int{ return 1; })>);
+  static_assert(2 == arity<decltype([](int, float) -> int{ return 1; })>);
+  static_assert(3 == arity<decltype([](int, float, double) -> int{ return 1; })>);
 
-  static_assert(1 == function_arg_count<std::function<int(int)>>);
-  static_assert(2 == function_arg_count<std::function<int(int, float)>>);
-  static_assert(3 == function_arg_count<std::function<int(int, float, double)>>);
-
-  // @brief Type used in `pairwise` matcher to always equal true.
-  struct match_any
-  {};
-
-  // @brief Recursively applies `Trait` to pack types from `0` to `min(sizeof...(LPack),
-  // sizeof...(RPack))`. Type `match_any` in either `LPack[I]` and/or `RPack[I]` is considered a
-  // match.
-  template<template<typename, typename> typename Trait, typename LPack, typename RPack,
-           size_t I = 0, size_t N = std::min(std::tuple_size_v<LPack>, std::tuple_size_v<RPack>)>
-  constexpr auto
-  check_pairwise_recursive() -> bool
-  {
-    if constexpr (I == N)
-    {
-      return true; // Base case: reached the end
-    }
-    else
-    {
-      using lhs_t = std::tuple_element_t<I, LPack>;
-      using rhs_t = std::tuple_element_t<I, RPack>;
-      if constexpr (std::same_as<match_any, lhs_t> || std::same_as<match_any, rhs_t>)
-      {
-        return check_pairwise_recursive<Trait, LPack, RPack, I + 1, N>();
-      }
-      else
-      {
-        return Trait<lhs_t, rhs_t>::value &&
-               check_pairwise_recursive<Trait, LPack, RPack, I + 1, N>();
-      }
-    }
-  }
+  static_assert(1 == arity<std::function<int(int)>>);
+  static_assert(2 == arity<std::function<int(int, float)>>);
+  static_assert(3 == arity<std::function<int(int, float, double)>>);
 }
