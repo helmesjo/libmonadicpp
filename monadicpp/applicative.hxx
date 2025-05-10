@@ -28,9 +28,8 @@ namespace fho
   /// behavior using templates and lambdas.
   ///
   /// The process works as follows:
-  /// 1. It checks if `f` is invocable with the provided `args` using `std::invocable`. If true, it
-  /// returns a zero-parameter callable wrapping the invocation `f(args...)`, forwarded with
-  /// `std::forward` (aliased as `FWD` for brevity) to preserve their value category.
+  /// 1. It checks if `f` is invocable with the provided `args`. If true, it invokes `f(args...)`.
+  /// (`std::forward`, aliased as `FWD` for brevity, to preserve their value category).
   /// 2. If `f` cannot be invoked yet (i.e., more arguments are needed), it captures `FWD(f)` and
   /// `FWD(args)` in a lambda that accepts additional arguments (`As...`) and recursively calls
   /// `curry`, using `std::forward_like` to maintain the value category relative to the lambda's
@@ -51,11 +50,7 @@ namespace fho
     /// 1.
     if constexpr (std::invocable<F, Args...>)
     {
-      return [f        = FWD(f),
-              ... args = FWD(args)]<typename Self, typename... As>(this Self&&) -> decltype(auto)
-      {
-        return std::forward_like<Self>(f)(std::forward_like<Self>(args)...);
-      };
+      return std::invoke(FWD(f), FWD(args)...);
     }
     /// 2.
     else
@@ -96,7 +91,7 @@ namespace fho
       constexpr auto add_curried = curry(add);
       constexpr auto indirect    = add_curried(1, 2);
 
-      return direct() == 15 && indirect() == 3;
+      return direct == 15 && indirect == 3;
     }(),
     "constexpr evaluation of curry() failed");
 
@@ -109,7 +104,7 @@ namespace fho
         return x + y;
       };
       constexpr auto add_5  = curry(add, 5);
-      constexpr int  result = add_5(10)();
+      constexpr int  result = add_5(10);
       return result == 15;
     }(),
     "constexpr evaluation of curry() failed");
@@ -124,7 +119,7 @@ namespace fho
       };
       constexpr int  x     = 10;
       constexpr auto add_x = curry(add, x);
-      return std::is_invocable_v<decltype(add_x), int> && add_x(20)() == 30;
+      return std::is_invocable_v<decltype(add_x), int> && add_x(20) == 30;
     }(),
     "Value category forwarding for lvalue failed");
 
@@ -137,7 +132,7 @@ namespace fho
         return x + y;
       };
       constexpr auto add_rvalue = curry(add, 5);
-      return std::is_invocable_v<decltype(add_rvalue), int> && add_rvalue(10)() == 15;
+      return std::is_invocable_v<decltype(add_rvalue), int> && add_rvalue(10) == 15;
     }(),
     "Value category forwarding for rvalue failed");
 
@@ -164,7 +159,7 @@ namespace fho
       };
       constexpr auto curried_three_1 = curry(three_args, 1);
       constexpr auto curried_three_2 = curried_three_1(2);
-      return curried_three_2(3)() == 6;
+      return curried_three_2(3) == 6;
     }(),
     "Incremental currying failed");
 
@@ -181,7 +176,7 @@ namespace fho
         return 0;
       };
       constexpr auto curried_only_int = curry(takes_not_an_int_and_int, not_an_int{5});
-      return std::invocable<decltype(curried_only_int), not_an_int> && curried_only_int(10)() == 0;
+      return std::invocable<decltype(curried_only_int), not_an_int> && curried_only_int(10) == 0;
     }(),
     "Type safety with custom types failed");
 }
