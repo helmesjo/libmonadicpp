@@ -3,7 +3,10 @@
 #include <monadicpp/detail/func_traits.hxx>
 
 #include <concepts>
+#include <tuple>
 #include <utility>
+
+#define FWD(...) ::std::forward<decltype(__VA_ARGS__)>(__VA_ARGS__)
 
 namespace fho::detail
 {
@@ -67,8 +70,16 @@ namespace fho::detail
     /// @brief Helper to create subtuple type from index sequence.
     /// @tparam Is Index sequence for subtuple elements.
     template<size_t... Is>
-    static auto make_subtuple(std::index_sequence<Is...>)
+    static constexpr auto make_subtuple(std::index_sequence<Is...>)
       -> std::tuple<std::tuple_element_t<Offset + Is, std::tuple<Ts...>>...>;
+
+    template<size_t... Is>
+    static constexpr auto
+    make_subtuple(std::index_sequence<Is...>, std::tuple<Ts...> outerTuple)
+      -> std::tuple<std::tuple_element_t<Offset + Is, std::tuple<Ts...>>...>
+    {
+      return std::forward_as_tuple(std::get<Offset + Is>(FWD(outerTuple))...);
+    }
 
     /// @brief Resulting subtuple type.
     using type = decltype(make_subtuple(std::make_index_sequence<Count>{}));
@@ -81,6 +92,14 @@ namespace fho::detail
   template<size_t Offset, size_t Count, typename T>
   using subtuple_t = typename tuple_subtypes<Offset, Count, T>::type;
 
+  template<size_t Offset, size_t Count, typename T>
+  constexpr auto
+  make_subtuple(T&& tp)
+  {
+    return tuple_subtypes<Offset, Count, T>::make_subtuple(std::make_index_sequence<Count>{},
+                                                           FWD(tp));
+  }
+
   /// TEST: Sub-tuple
   static_assert(std::same_as<std::tuple<int>, subtuple_t<0, 1, std::tuple<int, float, double>>>);
   static_assert(std::same_as<std::tuple<double>, subtuple_t<2, 1, std::tuple<int, float, double>>>);
@@ -89,6 +108,25 @@ namespace fho::detail
     std::same_as<std::tuple<int, float, double>, subtuple_t<0, 3, std::tuple<int, float, double>>>);
   static_assert(
     std::same_as<std::tuple<float, double>, subtuple_t<1, 2, std::tuple<int, float, double>>>);
+
+  static_assert(
+    []
+    {
+      constexpr auto sub = make_subtuple<0, 3>(std::tuple<int, char, long>{1, 2, 3});
+      return std::get<0>(sub) == 1 && std::get<1>(sub) == 2 && std::get<2>(sub) == 3;
+    }());
+  static_assert(
+    []
+    {
+      constexpr auto sub = make_subtuple<1, 1>(std::tuple<int, char, long>{1, 2, 3});
+      return std::get<0>(sub) == 2;
+    }());
+  static_assert(
+    []
+    {
+      constexpr auto sub = make_subtuple<2, 1>(std::tuple<int, char, long>{1, 2, 3});
+      return std::get<0>(sub) == 3;
+    }());
 }
 
 /// @brief Specializations of `tuple_element_t` & `tuple_size_v` for `monad_signature`.
@@ -127,3 +165,5 @@ namespace fho::detail
   static_assert(std::same_as<float(), std::tuple_element_t<1, monad_signature<int(), float()>>>);
   static_assert(2 == std::tuple_size_v<monad_signature<int(), float()>>);
 }
+
+#undef FWD
