@@ -1,10 +1,15 @@
 #pragma once
 
 #include <monadicpp/traits.hxx>
+#include <monadicpp/detail/cmacros.hxx>
 
 #include <concepts>
 #include <type_traits>
 #include <utility>
+
+#define FWD(...) ::std::forward<decltype(__VA_ARGS__)>(__VA_ARGS__)
+
+FHO_PUSH_OFF(FHO_W_UNUSED, FHO_W_UNDEF_INLINE)
 
 namespace fho
 {
@@ -50,13 +55,33 @@ namespace fho
       }
     };
 
-    /// @brief A null pure function.
+    /// @brief A pure null function.
     /// @details Placeholder function that returns a default-constructed value of the input type.
+    template<typename R, typename... Args>
     struct null_pure_func
     {
-      template<typename T>
       constexpr auto
-      operator()(T&&) const -> std::remove_cvref_t<T>
+      operator()(Args...) const -> R
+      {
+        return {};
+      }
+    };
+
+    /// @brief A null-type convertible to/from any other type.
+    /// @details Placeholder type that returns a default-constructed value of the input type.
+    struct null_any
+    {
+      /// @brief Allow conversion from any type to null_any
+      template<typename T>
+      constexpr null_any(T&&) noexcept // NOLINT
+      {}
+
+      constexpr null_any() noexcept = default;
+
+      // @brief Allow conversion from null_any to any type
+      template<typename T>
+      constexpr
+      operator T() const noexcept
       {
         return {};
       }
@@ -74,58 +99,57 @@ namespace fho
   static_assert(pairwise<std::is_convertible, std::tuple<float>, std::tuple<int, float>>);
 
   /// @brief Concept for monadic types.
-  /// @details Ensures a type has a value type, supports map and bind operations, and provides a
+  /// @details Ensures type `T` has a value type, supports map and bind operations, and provides a
   /// value extraction method.
   template<typename T>
-  concept monadic = requires (T t) {
-                      typename std::remove_cvref_t<T>::value_type;
-                      t.fmap(std::declval<detail::null_pure_func>());
-                      t.bind(std::declval<detail::null_monadic_func>());
-                      {
-                        t.value()
-                      } -> std::convertible_to<typename std::remove_cvref_t<T>::value_type>;
-                    };
+  concept monadic =
+    requires (T&& t) {
+      typename std::remove_cvref_t<T>::value_type;
+      t.fmap(
+        std::declval<detail::null_pure_func<int, typename std::remove_cvref_t<T>::value_type>>());
+      t.bind(std::declval<detail::null_monadic_func>());
+      { t.value() } -> std::convertible_to<typename std::remove_cvref_t<T>::value_type>;
+    };
 
   /// @brief Simple negation of `monadic` concept.
   template<typename T>
   concept not_monadic = !monadic<T>;
 
   /// @brief Concept for functor types.
-  /// @details Checks if a type supports map operation returning a monadic type.
+  /// @details Checks if type `T` has a value type and supports map operation returning a monadic
+  /// type.
   template<typename T>
-  concept functor = requires (T t) {
-                      { t.fmap(std::declval<detail::null_pure_func>()) } -> monadic;
-                    };
-
-  /// @concept chainable_func
-  /// @brief Checks if a type is invocable and its result is either monadic or another callable.
-  ///        Used for functions in monadic chaining (bind) or partial application (ap).
-  template<typename T, typename... Args>
-  concept chainable_func = requires {
-                             { std::declval<T>()(std::declval<Args>()...) } -> monadic;
-                           };
+  concept functor =
+    requires (T&& t) {
+      {
+        FWD(t).fmap(std::declval<detail::null_pure_func<detail::null_any, detail::null_any>>())
+      } -> monadic;
+    };
 
   /// @brief Concept for pure functions.
   /// @details Ensures a function is invocable with `Args...` and does not return a monadic type.
   template<typename T, typename... Args>
-  concept pure_func =
-    chainable_func<T, Args...> || requires {
-                                    { std::declval<T const>()(std::declval<Args>()...) };
-                                  };
+  concept pure_func = requires (T const t) {
+                        { t(std::declval<Args>()...) };
+                      };
 
   /// @brief Concept for invocable types with specific return type.
   /// @details Checks if a function, when invoked, returns a type convertible to the specified
   ///          return type.
   template<typename T, typename R, typename... Args>
   concept invocable_r = requires (T&& t, Args&&... args) {
-                          { std::invoke(t, std::forward<Args>(args)...) } -> std::convertible_to<R>;
+                          { std::invoke(FWD(t), FWD(args)...) } -> std::convertible_to<R>;
                         };
 
   template<typename F, typename M>
-  concept mappable = functor<M> && pure_func<F, typename std::remove_cvref_t<M>::value_type>;
+  concept mappable = pure_func<F, typename std::remove_cvref_t<M>::value_type>;
 
   template<typename F, typename M>
-  concept bindable = monadic<M> && chainable_func<F, typename std::remove_cvref_t<M>::value_type>;
+  concept bindable = requires (F&& f) {
+                       {
+                         FWD(f)(std::declval<typename std::remove_cvref_t<M>::value_type>())
+                       } -> monadic;
+                     };
 
   template<typename MF, typename M>
   concept applicative = functor<MF> && mappable<M, typename std::remove_cvref_t<MF>::value_type>;
@@ -133,7 +157,11 @@ namespace fho
   static_assert(monadic<detail::null_monad<int>>);
   static_assert(functor<detail::null_monad<int>>);
   static_assert(functor<detail::null_functor<int>>);
-  static_assert(chainable_func<detail::null_monadic_func, int>);
-  static_assert(pure_func<detail::null_pure_func, int>);
-  static_assert(mappable<detail::null_pure_func, detail::null_monad<int>>);
+  static_assert(bindable<detail::null_monadic_func, detail::null_monad<int>>);
+  static_assert(pure_func<detail::null_pure_func<int, int>, int>);
+  static_assert(mappable<detail::null_pure_func<int, int>, detail::null_monad<int>>);
 }
+
+FHO_POP_OFF
+
+#undef FWD
