@@ -100,6 +100,13 @@ namespace fho::detail
                                                            FWD(tp));
   }
 
+  template<size_t Offset, size_t Count, typename... Ts>
+  constexpr auto
+  forward_as_subtuple(Ts&&... ts)
+  {
+    return make_subtuple<Offset, Count>(std::forward_as_tuple(FWD(ts)...));
+  }
+
   /// TEST: Sub-tuple
   static_assert(std::same_as<std::tuple<int>, subtuple_t<0, 1, std::tuple<int, float, double>>>);
   static_assert(std::same_as<std::tuple<double>, subtuple_t<2, 1, std::tuple<int, float, double>>>);
