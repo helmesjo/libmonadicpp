@@ -25,10 +25,7 @@ namespace fho
         typename applied_t<std::invoke_result, Func, Bound, Unbound...>::type; // NOLINT
       using signature_type =
         typename applied_t<function_signature, result_type, Bound, Unbound...>::type;
-      static constexpr auto arity       = std::tuple_size_v<argument_types>;
-      static constexpr auto bound_arity = std::tuple_size_v<Bound>;
-      static constexpr auto unbound_arity =
-        (std::tuple_size_v<argument_types> - sizeof...(Unbound) - 1);
+      static constexpr auto arity = std::tuple_size_v<argument_types>;
 
       constexpr explicit curried(function_type f)
         : func_(std::move(f))
@@ -40,38 +37,48 @@ namespace fho
       {}
 
       template<typename... _Bound> // NOLINT
-      constexpr auto
-      operator()(_Bound&&... args)
         requires (fho::pairwise<std::is_convertible, std::tuple<_Bound...>, unbound_types>)
+      constexpr explicit curried(Func f, _Bound&&... args)
+        : func_(std::move(f))
+        , bound_(FWD(args)...)
+      {}
+
+      constexpr auto
+      operator()(auto&&... args)
+        requires (fho::pairwise<std::is_convertible, std::tuple<decltype(args)...>, unbound_types>)
       {
+        /// Unpack bound arguments along with `args`.
         return std::apply(
-          [this, f = std::forward<Func>(func_),
-           ... args = FWD(args)]<typename Self>(this Self&&, auto&&... bound)
+          [f = std::forward<Func>(func_)]<typename... Bound_>(Bound_&&... bound)
           {
-            if constexpr (std::invocable<Func, decltype(FWD(bound))..., _Bound...>)
+            /// We done?
+            if constexpr (std::invocable<Func, decltype(FWD(bound))...>)
             {
-              return std::invoke(f, bound..., args...);
+              return std::invoke(f, bound...);
             }
             else
             {
-              constexpr auto _bound_arity = bound_arity + sizeof...(_Bound); // NOLINT
-              constexpr auto _remain      = arity - _bound_arity;            // NOLINT
+              constexpr auto _bound_arity   = sizeof...(bound);     // NOLINT
+              constexpr auto _unbound_arity = arity - _bound_arity; // NOLINT
+              static_assert(_unbound_arity > 0, "fho-library-bug(1234): No arguments remaining but "
+                                                "still not considered `std::invocable`");
+
+              /// Recursive `curried` with `sizeof...(args)` less arguments to apply.
               return apply(
-                [this, f = std::forward_like<Self>(f),
-                 ... args = std::forward_like<Self>(args)]<typename... Remain>(Remain&&...)
+                [f = std::forward<Func>(f), ... bound = FWD(bound)]<typename... Remain>(Remain&&...)
                 {
-                  return curried<Func, tuple_concat_t<Bound, _Bound...>, Remain...>(
-                    std::forward_like<Self>(f),
-                    tuple_concat(bound_, std::forward_like<Self>(args)...));
+                  return curried<Func, std::tuple<Bound_...>, Remain...>(std::forward_like<Func>(f),
+                                                                         std::forward_like<Func>(
+                                                                           bound)...);
                 },
-                subtuple_t<_bound_arity, _remain, argument_types>{});
+                subtuple_t<_bound_arity, _unbound_arity, argument_types>{});
             }
           },
-          bound_);
+          tuple_concat(bound_, std::forward_as_tuple(FWD(args)...)));
       }
 
     private:
-      std::remove_reference_t<function_type> func_;
+      std::remove_reference_t<function_type> func_; // NOLINT
       Bound                                  bound_;
     };
 

@@ -36,7 +36,7 @@ CheckOptions:
   - key:             readability-identifier-naming.TemplateParameterCase
     value:           CamelCase
   - key:             readability-identifier-naming.TemplateParameterIgnoredRegexp
-    value:           "([A-Z]|expr-type)"
+    value:           "([A-Z]|expr-type|[A-Za-z]+_)"
   - key:             readability-identifier-naming.TemplateTemplateParameterCase
     value:           CamelCase
   - key:             readability-identifier-naming.TypeAliasCase
