@@ -141,21 +141,29 @@ namespace fho::detail
 
   /// @brief Tuple concatination.
   /// @param tp1 First tuple.
-  /// @param types Variadic arguments.
-  template<typename Tuple, typename... Types>
-    requires (sizeof...(Types) > 1 || !tuple_like<std::tuple_element_t<0, std::tuple<Types...>>>)
+  /// @param types Variadic arguments (non-empty).
+  template<typename... Types>
+    requires (sizeof...(Types) > 0 && !tuple_like<std::tuple_element_t<0, std::tuple<Types...>>>)
   constexpr auto
-  tuple_concat(Tuple&& tp, Types&&... types)
+  tuple_concat(tuple_like auto&& tp, Types&&... types)
   {
     return std::tuple_cat(FWD(tp), std::tuple<Types...>(FWD(types)...));
   }
 
   /// @brief Tuple concatination.
   /// @param tp1 First tuple.
-  /// @param tp2 Second tuple.
-  template<typename Tuple>
+  /// @param types Variadic arguments (non-empty).
   constexpr auto
-  tuple_concat(Tuple&& tp1, tuple_like auto&& tp2)
+  tuple_concat(tuple_like auto&& tp)
+  {
+    return FWD(tp);
+  }
+
+  /// @brief Tuple concatination.
+  /// @param tp1 First tuple.
+  /// @param tp2 Second tuple.
+  constexpr auto
+  tuple_concat(tuple_like auto&& tp1, tuple_like auto&& tp2)
   {
     return std::tuple_cat(FWD(tp1), FWD(tp2));
   }
@@ -166,6 +174,9 @@ namespace fho::detail
   using tuple_concat_t = decltype(tuple_concat(std::declval<Tuple>(), std::declval<Types>()...));
 
   /// TEST: Tuple concatination
+  static_assert(
+    std::same_as<std::tuple<int, float>, tuple_concat_t<std::tuple<int, float>, std::tuple<>>>);
+  static_assert(std::same_as<std::tuple<int, float>, tuple_concat_t<std::tuple<int, float>>>);
   static_assert(std::same_as<std::tuple<int, float, double, int>,
                              tuple_concat_t<std::tuple<int, float>, double, int>>);
   static_assert(std::same_as<std::tuple<int, float, double, int>,
@@ -192,9 +203,18 @@ namespace fho::detail
     static constexpr auto
     deduce(std::index_sequence<I, N>, std::tuple<T..., Types...>*)
     {
-      using CurrentType = std::tuple_element_t<I, std::tuple<T...>>;
-      return deduce<A, Tail...>(std::index_sequence<I + 1, N>{},
-                                static_cast<std::tuple<Types..., CurrentType>*>(nullptr));
+      if constexpr (N == 0)
+      {
+        // Empty tuple case: no elements to unpack
+        return deduce<A, Tail...>(std::index_sequence<I, N>{},
+                                  static_cast<std::tuple<Types...>*>(nullptr));
+      }
+      else
+      {
+        using CurrentType = std::tuple_element_t<I, std::tuple<T...>>;
+        return deduce<A, Tail...>(std::index_sequence<I + 1, N>{},
+                                  static_cast<std::tuple<Types..., CurrentType>*>(nullptr));
+      }
     }
 
   public:
