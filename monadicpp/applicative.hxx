@@ -1,9 +1,11 @@
 #pragma once
 
 #include <monadicpp/concepts.hxx>
+#include <monadicpp/traits.hxx>
 #include <monadicpp/detail/func_traits.hxx>
 
 #include <concepts>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 
@@ -11,6 +13,100 @@
 
 namespace fho
 {
+  namespace detail
+  {
+    template<typename Func, typename Bound, typename... Unbound>
+    struct curried
+    {
+      using function_type  = Func;
+      using argument_types = tuple_concat_t<Bound, Unbound...>;
+      using unbound_types  = std::tuple<Unbound...>;
+      using result_type =
+        typename applied_t<std::invoke_result, Func, Bound, Unbound...>::type; // NOLINT
+      using signature_type =
+        typename applied_t<function_signature, result_type, Bound, Unbound...>::type;
+      static constexpr auto arity       = std::tuple_size_v<argument_types>;
+      static constexpr auto bound_arity = std::tuple_size_v<Bound>;
+      static constexpr auto unbound_arity =
+        (std::tuple_size_v<argument_types> - sizeof...(Unbound) - 1);
+
+      constexpr explicit curried(function_type f)
+        : func_(std::move(f))
+      {}
+
+      constexpr explicit curried(Func f, Bound args)
+        : func_(std::move(f))
+        , bound_(std::move(args))
+      {}
+
+      template<typename... _Bound> // NOLINT
+      constexpr auto
+      operator()(_Bound&&... args)
+        requires (fho::pairwise<std::is_convertible, std::tuple<_Bound...>, unbound_types>)
+      {
+        return std::apply(
+          [this, f = std::forward<Func>(func_),
+           ... args = FWD(args)]<typename Self>(this Self&&, auto&&... bound)
+          {
+            if constexpr (std::invocable<Func, decltype(FWD(bound))..., _Bound...>)
+            {
+              return std::invoke(f, bound..., args...);
+            }
+            else
+            {
+              constexpr auto _bound_arity = bound_arity + sizeof...(_Bound); // NOLINT
+              constexpr auto _remain      = arity - _bound_arity;            // NOLINT
+              return apply(
+                [this, f = std::forward_like<Self>(f),
+                 ... args = std::forward_like<Self>(args)]<typename... Remain>(Remain&&...)
+                {
+                  return curried<Func, tuple_concat_t<Bound, _Bound...>, Remain...>(
+                    std::forward_like<Self>(f),
+                    tuple_concat(bound_, std::forward_like<Self>(args)...));
+                },
+                subtuple_t<_bound_arity, _remain, argument_types>{});
+            }
+          },
+          bound_);
+      }
+
+    private:
+      std::remove_reference_t<function_type> func_;
+      Bound                                  bound_;
+    };
+
+    // template<typename Func, typename... Bound>
+    // curried(Func&&, Bound&&...)-> typename detail::applied_t<curried, Func,
+    // std::tuple<Bound...>>::type;
+
+    // template<typename Func, typename... Args>
+    // curried(Func&&, Args&&...)
+
+    template<typename T>
+    struct detect;
+
+    // constexpr auto fyo = [](int, float, double)
+    // {
+    //   return 1;
+    // };
+    // using detect<
+    //   typename detail::applied_t<curried, decltype(fyo), std::tuple<std::tuple<int>>>::type>
+    //   sadasdsa;
+
+    constexpr auto fyo = [](int a, float b, double c)
+    {
+      return a + b + c;
+    };
+    auto derp = curried<decltype(fyo), std::tuple<>, int, float, double>(fyo);
+    // // using smerg = typename decltype(derp)::signature_type;
+    // // detect<smerg> asdsad;
+    constexpr auto wut  = derp(1, 2.0f, 3.0);
+    constexpr auto wut1 = derp(1);
+    constexpr auto wut2 = derp(1)(2);
+    constexpr auto wut3 = derp(1)(2)(3);
+    // detect<decltype(wut2)> asdsad;
+  }
+
   /// @brief Creates a curried version of a function, enabling partial application.
   ///
   /// @tparam F The type of the function to curry.
