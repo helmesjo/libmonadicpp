@@ -134,6 +134,102 @@ namespace fho::detail
       constexpr auto sub = make_subtuple<2, 1>(std::tuple<int, char, long>{1, 2, 3});
       return std::get<0>(sub) == 3;
     }());
+
+  /// @brief Concept to detect tuple-like types.
+  template<typename T>
+  concept tuple_like = requires { typename std::tuple_size<std::remove_cvref_t<T>>::type; };
+
+  /// @brief Tuple concatination.
+  /// @param tp1 First tuple.
+  /// @param types Variadic arguments.
+  template<typename Tuple, typename... Types>
+    requires (sizeof...(Types) > 1 || !tuple_like<std::tuple_element_t<0, std::tuple<Types...>>>)
+  constexpr auto
+  tuple_concat(Tuple&& tp, Types&&... types)
+  {
+    return std::tuple_cat(FWD(tp), std::tuple<Types...>(FWD(types)...));
+  }
+
+  /// @brief Tuple concatination.
+  /// @param tp1 First tuple.
+  /// @param tp2 Second tuple.
+  template<typename Tuple>
+  constexpr auto
+  tuple_concat(Tuple&& tp1, tuple_like auto&& tp2)
+  {
+    return std::tuple_cat(FWD(tp1), FWD(tp2));
+  }
+
+  /// @brief Concatenated tuple type of `Tuple` and `Types...`.
+  /// @detailed `Types...` is a tuple-like or variadic types.
+  template<typename Tuple, typename... Types>
+  using tuple_concat_t = decltype(tuple_concat(std::declval<Tuple>(), std::declval<Types>()...));
+
+  /// TEST: Tuple concatination
+  static_assert(std::same_as<std::tuple<int, float, double, int>,
+                             tuple_concat_t<std::tuple<int, float>, double, int>>);
+  static_assert(std::same_as<std::tuple<int, float, double, int>,
+                             tuple_concat_t<std::tuple<int, float>, std::tuple<double, int>>>);
+
+  /// @brief Applies a trait to unpacked tuple types and additional arguments.
+  template<template<typename...> typename Trait, typename Arg1, typename Tuple, typename... Rest>
+  struct applied_tuple
+  {
+  private:
+    /// @brief Base case for unpacking: no more tuple elements to process.
+    /// @detailed When `I` equals `N`, all tuple elements have been unpacked into `Types...`.
+    ///           Applies `Trait` to `Arg1`, the unpacked `Types...`, and `Tail...`, yielding the
+    ///           final type.
+    template<typename A, typename... Tail, size_t I, size_t N, typename... Types>
+    static constexpr auto deduce(std::index_sequence<I, N>, std::tuple<Types...>*)
+      -> Trait<A, Types..., Tail...>;
+
+    /// @brief Recursive case for unpacking tuple elements.
+    /// @detailed Extracts the `I`-th type from the tuple `T...`, appends it to `Types...`,
+    ///           and recursively processes the next element by incrementing `I` until `I`
+    ///           equals `N`.
+    template<typename A, typename... T, typename... Tail, size_t I, size_t N, typename... Types>
+    static constexpr auto
+    deduce(std::index_sequence<I, N>, std::tuple<T..., Types...>*)
+    {
+      using CurrentType = std::tuple_element_t<I, std::tuple<T...>>;
+      return deduce<A, Tail...>(std::index_sequence<I + 1, N>{},
+                                static_cast<std::tuple<Types..., CurrentType>*>(nullptr));
+    }
+
+  public:
+    /// @brief Resulting type after applying `Trait` to `Arg1`, unpacked `Tuple` types, and
+    ///        `Rest...`.
+    using type = decltype(deduce<Arg1, Rest...>(
+      std::index_sequence<0, std::tuple_size_v<std::remove_cvref_t<Tuple>>>{},
+      static_cast<std::remove_cvref_t<Tuple>*>(nullptr)));
+  };
+
+  /// @brief Applies `Tuple` & `Rest...` to `Trait`.
+  template<template<typename...> typename Trait, typename Arg1, typename Tuple, typename... Rest>
+  using applied_t = typename applied_tuple<Trait, Arg1, Tuple, Rest...>::type;
+
+  /// TEST: Tuple applied to type trait.
+  static_assert(
+    []
+    {
+      constexpr auto l = [](auto a, float&)
+      {
+        return a;
+      };
+      return std::same_as<int,
+                          applied_t<std::invoke_result_t, decltype(l), std::tuple<int, float&>>>;
+    }());
+  static_assert(
+    []
+    {
+      constexpr auto l = [](auto& a, float)
+      {
+        return a;
+      };
+      return std::same_as<int,
+                          applied_t<std::invoke_result_t, decltype(l), std::tuple<int&>, float>>;
+    }());
 }
 
 /// @brief Specializations of `tuple_element_t` & `tuple_size_v` for `monad_signature`.
