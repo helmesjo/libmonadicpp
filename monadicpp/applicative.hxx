@@ -37,15 +37,15 @@ namespace fho
       {}
 
       template<typename... _Bound> // NOLINT
-        requires (fho::pairwise<std::is_convertible, std::tuple<_Bound...>, unbound_types>)
+        requires (fho::pairwise<std::tuple<_Bound...>, std::is_convertible, unbound_types>)
       constexpr explicit curried(Func f, _Bound&&... args)
         : func_(std::move(f))
         , bound_(FWD(args)...)
       {}
 
       constexpr auto
-      operator()(auto&&... args)
-        requires (fho::pairwise<std::is_convertible, std::tuple<decltype(args)...>, unbound_types>)
+      operator()(auto&&... args) const
+        requires (fho::pairwise<std::tuple<decltype(args)...>, std::is_convertible, unbound_types>)
       {
         /// Unpack bound arguments along with `args`.
         return std::apply(
@@ -164,7 +164,7 @@ namespace fho
                                                                    As&&... as) -> decltype(auto)
              /// 3. Aligns comparison with `detail::match_any` (always true).
                requires (sizeof...(As) > 0 && (sizeof...(As) <= detail::arity<F>)) &&
-                        pairwise<std::is_convertible, std::tuple<Args...>,
+                        pairwise<std::tuple<Args...>, std::is_convertible,
                                  std::tuple<detail::match_any, As...>>
 
       {

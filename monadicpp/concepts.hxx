@@ -78,7 +78,7 @@ namespace fho
 
       constexpr null_any() noexcept = default;
 
-      // @brief Allow conversion from null_any to any type
+      /// @brief Allow conversion from null_any to any type
       template<typename T>
       constexpr
       operator T() const noexcept
@@ -87,14 +87,14 @@ namespace fho
       }
     };
 
-    // @brief Type used in `pairwise` matcher to always equal true.
+    /// @brief Type used in `pairwise` matcher to always equal true.
     struct match_any
     {};
 
-    // @brief Recursively applies `Trait` to pack types from `0` to `min(sizeof...(LPack),
-    // sizeof...(RPack))`. Type `match_any` in either `LPack[I]` and/or `RPack[I]` is considered a
-    // match.
-    template<template<typename, typename> typename Trait, typename LPack, typename RPack,
+    /// @brief Recursively applies `Trait` to pack types from `0` to
+    /// `min(sizeof...(LPack), sizeof...(RPack))`.
+    /// Type `match_any` in either `LPack[I]` and/or `RPack[I]` is considered a match.
+    template<typename LPack, template<typename, typename> typename Trait, typename RPack,
              size_t I = 0, size_t N = std::min(std::tuple_size_v<LPack>, std::tuple_size_v<RPack>)>
     constexpr auto
     check_pairwise_recursive() -> bool
@@ -109,26 +109,26 @@ namespace fho
         using rhs_t = std::tuple_element_t<I, RPack>;
         if constexpr (std::same_as<match_any, lhs_t> || std::same_as<match_any, rhs_t>)
         {
-          return check_pairwise_recursive<Trait, LPack, RPack, I + 1, N>();
+          return check_pairwise_recursive<LPack, Trait, RPack, I + 1, N>();
         }
         else
         {
           return Trait<lhs_t, rhs_t>::value &&
-                 check_pairwise_recursive<Trait, LPack, RPack, I + 1, N>();
+                 check_pairwise_recursive<LPack, Trait, RPack, I + 1, N>();
         }
       }
     }
   }
 
-  template<template<typename, typename> typename Concept, typename LPack, typename RPack,
+  template<typename LPack, template<typename, typename> typename Concept, typename RPack,
            size_t I = 0>
-  concept pairwise = detail::check_pairwise_recursive<Concept, LPack, RPack, I>();
+  concept pairwise = detail::check_pairwise_recursive<LPack, Concept, RPack, I>();
 
-  static_assert(pairwise<std::is_same, std::tuple<int, float>, std::tuple<int>>);
-  static_assert(pairwise<std::is_same, std::tuple<int, float>, std::tuple<int, float>>);
-  static_assert(!pairwise<std::is_same, std::tuple<float, float>, std::tuple<int>>);
-  static_assert(pairwise<std::is_convertible, std::tuple<int, float>, std::tuple<float>>);
-  static_assert(pairwise<std::is_convertible, std::tuple<float>, std::tuple<int, float>>);
+  static_assert(pairwise<std::tuple<int, float>, std::is_same, std::tuple<int>>);
+  static_assert(pairwise<std::tuple<int, float>, std::is_same, std::tuple<int, float>>);
+  static_assert(!pairwise<std::tuple<float, float>, std::is_same, std::tuple<int>>);
+  static_assert(pairwise<std::tuple<int, float>, std::is_convertible, std::tuple<float>>);
+  static_assert(pairwise<std::tuple<float>, std::is_convertible, std::tuple<int, float>>);
 
   /// @brief Concept for monadic types.
   /// @details Ensures type `T` has a value type, supports map and bind operations, and provides a
