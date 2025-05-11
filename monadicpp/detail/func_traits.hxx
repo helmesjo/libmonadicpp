@@ -7,12 +7,10 @@ namespace fho::detail
 {
   /// @brief Primary template.
   template<typename... T>
-  struct function_signature
-  {};
+  struct function_signature;
 
   /// @breif Fallback specialization for plain signature.
   template<typename R, typename... Args>
-    requires (sizeof...(Args) > 0)
   struct function_signature<R, Args...>
   {
     using type           = R(Args...);

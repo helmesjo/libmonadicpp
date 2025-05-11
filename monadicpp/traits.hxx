@@ -192,29 +192,24 @@ namespace fho::detail
     ///           Applies `Trait` to `Arg1`, the unpacked `Types...`, and `Tail...`, yielding the
     ///           final type.
     template<typename A, typename... Tail, size_t I, size_t N, typename... Types>
-    static constexpr auto deduce(std::index_sequence<I, N>, std::tuple<Types...>*)
-      -> Trait<A, Types..., Tail...>;
+    static constexpr auto
+    deduce(std::index_sequence<I, N>, std::tuple<Types...>*) -> Trait<A, Types..., Tail...>
+    {
+      return {};
+    }
 
     /// @brief Recursive case for unpacking tuple elements.
     /// @detailed Extracts the `I`-th type from the tuple `T...`, appends it to `Types...`,
     ///           and recursively processes the next element by incrementing `I` until `I`
     ///           equals `N`.
     template<typename A, typename... T, typename... Tail, size_t I, size_t N, typename... Types>
+      requires (N > 0)
     static constexpr auto
-    deduce(std::index_sequence<I, N>, std::tuple<T..., Types...>*)
+    deduce(std::index_sequence<I, N>, std::tuple<T..., Types...>*) -> decltype(auto)
     {
-      if constexpr (N == 0)
-      {
-        // Empty tuple case: no elements to unpack
-        return deduce<A, Tail...>(std::index_sequence<I, N>{},
-                                  static_cast<std::tuple<Types...>*>(nullptr));
-      }
-      else
-      {
-        using CurrentType = std::tuple_element_t<I, std::tuple<T...>>;
-        return deduce<A, Tail...>(std::index_sequence<I + 1, N>{},
-                                  static_cast<std::tuple<Types..., CurrentType>*>(nullptr));
-      }
+      using CurrentType = std::tuple_element_t<I, std::tuple<T...>>;
+      return deduce<A, Tail...>(std::index_sequence<I + 1, N>{},
+                                static_cast<std::tuple<Types..., CurrentType>*>(nullptr));
     }
 
   public:
