@@ -5,9 +5,54 @@
 
 namespace fho::detail
 {
-  /// @breif Primary Template. Specialization for callables (lambdas, functors, ...).
-  template<typename T>
+  /// @brief Primary template.
+  template<typename... T>
   struct function_signature
+  {};
+
+  /// @breif Fallback specialization for plain signature.
+  template<typename R, typename... Args>
+    requires (sizeof...(Args) > 0)
+  struct function_signature<R, Args...>
+  {
+    using type           = R(Args...);
+    using argument_types = std::tuple<Args...>;
+
+    template<auto I>
+    using argument_type_t = std::tuple_element_t<I, std::tuple<Args...>>;
+
+    static constexpr auto arity = sizeof...(Args);
+  };
+
+  /// @brief Specialization where `T` has expected aliases.
+  template<typename T>
+    requires requires {
+               typename std::remove_cvref_t<T>::function_type;
+               typename std::remove_cvref_t<T>::argument_types;
+               typename std::remove_cvref_t<T>::result_type;
+               std::remove_cvref_t<T>::arity;
+             }
+  struct function_signature<T>
+  {
+    using type           = typename std::remove_reference_t<T>::function_type;
+    using argument_types = typename std::remove_reference_t<T>::argument_types;
+
+    template<auto I>
+    using argument_type_t = std::tuple_element_t<I, argument_types>;
+
+    static constexpr auto arity = std::remove_reference_t<T>::arity;
+  };
+
+  /// @brief Specialization for callables (lambdas, functors with operator()).
+  template<typename T>
+    requires requires { &std::remove_cvref_t<T>::operator(); } &&
+             (!requires {
+                 typename std::remove_cvref_t<T>::function_type;
+                 typename std::remove_cvref_t<T>::argument_types;
+                 typename std::remove_cvref_t<T>::result_type;
+                 std::remove_cvref_t<T>::arity;
+               })
+  struct function_signature<T>
   {
     /// @breif  Extract `operator()` signature.
     using type           = typename function_signature<decltype(&T::operator())>::type;
@@ -99,8 +144,8 @@ namespace fho::detail
   };
 
   /// @breif Type trait to extract `T` function signature.
-  template<typename T>
-  using function_signature_t = typename function_signature<T>::type;
+  template<typename... Ts>
+  using function_signature_t = typename function_signature<Ts...>::type;
 
   /// @breif Type trait to extract argument types for function `T`.
   template<typename T>
