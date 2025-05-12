@@ -2,6 +2,7 @@
 
 #include <monadicpp/traits.hxx>
 #include <monadicpp/detail/cmacros.hxx>
+#include <monadicpp/detail/disambiguate.hxx>
 
 #include <concepts>
 #include <type_traits>
@@ -185,6 +186,13 @@ namespace fho
 
   template<typename MF, typename M>
   concept applicative = functor<MF> && mappable<M, typename std::remove_cvref_t<MF>::value_type>;
+
+  /// @brief Concept for invocable types considered first-class citizens.
+  /// @details Checks if `T` is an un-ambiguous callable (single signature, no overload ambiguity).
+  template<typename T>
+  concept promoted = std::move_constructible<T> && requires (T&& t) {
+                                                     { detail::partial<>::type(FWD(t)) };
+                                                   };
 
   static_assert(monadic<detail::null_monad<int>>);
   static_assert(functor<detail::null_monad<int>>);
