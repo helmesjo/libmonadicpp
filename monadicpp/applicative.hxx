@@ -9,109 +9,46 @@
 #include <type_traits>
 #include <utility>
 
+#include "monadicpp/detail/disambiguate.hxx"
+
 #define FWD(...) ::std::forward<decltype(__VA_ARGS__)>(__VA_ARGS__)
 
 namespace fho
 {
-  namespace detail
+  /// @brief Promotes a callable into a first-class citizen with a fully resolved signature.
+  /// @details Transforms a callable (function, functor, or member function pointer) into a
+  /// first-class citizen by making it a value that can be passed, returned, or assigned and has a
+  /// resolved function signature by disambiguating overloads using the provided argument types.
+  /// @tparam `Args` Parameter pack of types used for overload resolution if the callable has
+  /// ambiguous overloads.
+  /// @tparam `C` Type of the callable to promote (e.g., function, functor, or member function
+  /// pointer).
+  /// @param `simpleton` The callable to transform into a first-class citizen.
+  /// @return A new callable that is a first-class citizen with a fully resolved signature.
+  template<typename... Args, std::move_constructible C>
+  constexpr auto
+  promote(C&& simpleton)
   {
-    template<typename Func, typename Bound, typename... Unbound>
-    struct curried
-    {
-      using function_type  = Func;
-      using argument_types = tuple_concat_t<Bound, Unbound...>;
-      using unbound_types  = std::tuple<Unbound...>;
-      using result_type =
-        typename applied_t<std::invoke_result, Func, Bound, Unbound...>::type; // NOLINT
-      using signature_type =
-        typename applied_t<function_signature, result_type, Bound, Unbound...>::type;
-      static constexpr auto arity = std::tuple_size_v<argument_types>;
-
-      constexpr explicit curried(function_type f)
-        : func_(std::move(f))
-      {}
-
-      constexpr explicit curried(Func f, Bound args)
-        : func_(std::move(f))
-        , bound_(std::move(args))
-      {}
-
-      template<typename... _Bound> // NOLINT
-        requires (fho::pairwise<std::tuple<_Bound...>, std::is_convertible, unbound_types>)
-      constexpr explicit curried(Func f, _Bound&&... args)
-        : func_(std::move(f))
-        , bound_(FWD(args)...)
-      {}
-
-      constexpr auto
-      operator()(auto&&... args) const
-        requires (fho::pairwise<std::tuple<decltype(args)...>, std::is_convertible, unbound_types>)
+    auto vip = detail::partial<Args...>::type(simpleton);
+    return std::apply(
+      [c = FWD(simpleton), vip = std::move(vip)]<typename... Params>(Params&&...) constexpr mutable
       {
-        /// Unpack bound arguments along with `args`.
-        return std::apply(
-          [f = std::forward<Func>(func_)]<typename... Bound_>(Bound_&&... bound)
+        return [c   = std::move(c),
+                vip = std::move(vip)]<typename Self>(this Self&&,
+                                                     Params&&... args) constexpr -> decltype(auto)
+        {
+          if constexpr (std::is_function_v<std::remove_reference_t<C>>)
           {
-            /// We done?
-            if constexpr (std::invocable<Func, decltype(FWD(bound))...>)
-            {
-              return std::invoke(f, bound...);
-            }
-            else
-            {
-              constexpr auto _bound_arity   = sizeof...(bound);     // NOLINT
-              constexpr auto _unbound_arity = arity - _bound_arity; // NOLINT
-              static_assert(_unbound_arity > 0, "fho-library-bug(1234): No arguments remaining but "
-                                                "still not considered `std::invocable`");
-
-              /// Recursive `curried` with `sizeof...(args)` less arguments to apply.
-              return apply(
-                [f = std::forward<Func>(f), ... bound = FWD(bound)]<typename... Remain>(Remain&&...)
-                {
-                  return curried<Func, std::tuple<Bound_...>, Remain...>(std::forward_like<Func>(f),
-                                                                         std::forward_like<Func>(
-                                                                           bound)...);
-                },
-                subtuple_t<_bound_arity, _unbound_arity, argument_types>{});
-            }
-          },
-          tuple_concat(bound_, std::forward_as_tuple(FWD(args)...)));
-      }
-
-    private:
-      std::remove_reference_t<function_type> func_; // NOLINT
-      Bound                                  bound_;
-    };
-
-    // template<typename Func, typename... Bound>
-    // curried(Func&&, Bound&&...)-> typename detail::applied_t<curried, Func,
-    // std::tuple<Bound...>>::type;
-
-    // template<typename Func, typename... Args>
-    // curried(Func&&, Args&&...)
-
-    template<typename T>
-    struct detect;
-
-    // constexpr auto fyo = [](int, float, double)
-    // {
-    //   return 1;
-    // };
-    // using detect<
-    //   typename detail::applied_t<curried, decltype(fyo), std::tuple<std::tuple<int>>>::type>
-    //   sadasdsa;
-
-    constexpr auto fyo = [](int a, float b, double c)
-    {
-      return a + b + c;
-    };
-    auto derp = curried<decltype(fyo), std::tuple<>, int, float, double>(fyo);
-    // // using smerg = typename decltype(derp)::signature_type;
-    // // detect<smerg> asdsad;
-    constexpr auto wut  = derp(1, 2.0f, 3.0);
-    constexpr auto wut1 = derp(1);
-    constexpr auto wut2 = derp(1)(2);
-    constexpr auto wut3 = derp(1)(2)(3);
-    // detect<decltype(wut2)> asdsad;
+            return std::invoke(std::forward_like<Self>(vip), FWD(args)...);
+          }
+          else
+          {
+            return std::invoke(std::forward_like<Self>(vip), std::forward_like<Self>(c),
+                               FWD(args)...);
+          }
+        };
+      },
+      detail::argument_types_t<decltype(vip)>{});
   }
 
   /// @brief Creates a curried version of a function, enabling partial application.
