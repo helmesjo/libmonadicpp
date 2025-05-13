@@ -231,7 +231,9 @@ namespace fho::detail::tests
       }
     };
 
-    // Free function tests
+    template<typename T, typename... Args>
+    constexpr auto can_deduce = requires { partial<Args...>::type(std::declval<T>()); };
+
     /// @test Free Functions
     /// @brief
     /// No ambiguity with all arguments inferred.
@@ -314,8 +316,7 @@ namespace fho::detail::tests
       }(),
       "Ambiguity with not enough arguments explicit, can't infer rest (expects failure)");
 
-    // Non-const member function tests
-    /// @test Member Functions
+    /// @test Non-const Member Functions
     /// @brief
     /// No ambiguity with all arguments inferred.
     static_assert(
@@ -327,7 +328,7 @@ namespace fho::detail::tests
       }(),
       "No ambiguity with all arguments inferred");
 
-    /// @test Member Functions
+    /// @test Non-const Member Functions
     /// @brief
     /// No ambiguity with all arguments explicit.
     static_assert(
@@ -339,7 +340,7 @@ namespace fho::detail::tests
       }(),
       "No ambiguity with all arguments explicit");
 
-    /// @test Member Functions
+    /// @test Non-const Member Functions
     /// @brief
     /// No ambiguity with first argument explicit, rest inferred.
     static_assert(
@@ -351,7 +352,7 @@ namespace fho::detail::tests
       }(),
       "No ambiguity with first argument explicit, rest inferred");
 
-    /// @test Member Functions
+    /// @test Non-const Member Functions
     /// @brief
     /// Ambiguity with all arguments inferred (expects failure).
     static_assert(
@@ -362,7 +363,7 @@ namespace fho::detail::tests
       }(),
       "Ambiguity with all arguments inferred (expects failure)");
 
-    /// @test Member Functions
+    /// @test Non-const Member Functions
     /// @brief
     /// Ambiguity with all arguments explicit.
     static_assert(
@@ -374,7 +375,7 @@ namespace fho::detail::tests
       }(),
       "Ambiguity with all arguments explicit");
 
-    /// @test Member Functions
+    /// @test Non-const Member Functions
     /// @brief
     /// Ambiguity with first argument explicit, rest inferred.
     static_assert(
@@ -386,7 +387,7 @@ namespace fho::detail::tests
       }(),
       "Ambiguity with first argument explicit, rest inferred");
 
-    /// @test Member Functions
+    /// @test Non-const Member Functions
     /// @brief
     /// Ambiguity with not enough arguments explicit, can't infer rest (expects failure).
     static_assert(
@@ -558,8 +559,7 @@ namespace fho::detail::tests
     static_assert(
       [] -> bool
       {
-        // partial<> with no arguments would fail to resolve
-        return true; // Note: This would fail to compile if partial<> was used
+        return !can_deduce<callable>;
       }(),
       "Ambiguity with not enough arguments explicit, can't infer rest (expects failure)");
   }
