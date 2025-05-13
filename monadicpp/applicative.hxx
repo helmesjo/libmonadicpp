@@ -29,26 +29,34 @@ namespace fho
   constexpr auto
   promote(C&& simpleton)
   {
-    auto vip = detail::partial<Args...>::type(simpleton);
-    return std::apply(
-      [c = FWD(simpleton), vip = std::move(vip)]<typename... Params>(Params&&...) constexpr mutable
-      {
-        return [c   = std::move(c),
-                vip = std::move(vip)]<typename Self>(this Self&&,
-                                                     Params&&... args) constexpr -> decltype(auto)
+    if constexpr (promoted<C>)
+    {
+      return FWD(simpleton);
+    }
+    else
+    {
+      auto vip = detail::partial<Args...>::type(simpleton);
+      return std::apply(
+        [c   = FWD(simpleton),
+         vip = std::move(vip)]<typename... Params>(Params&&...) constexpr mutable
         {
-          if constexpr (std::is_function_v<std::remove_reference_t<C>>)
+          return [c   = std::move(c),
+                  vip = std::move(vip)]<typename Self>(this Self&&,
+                                                       Params&&... args) constexpr -> decltype(auto)
           {
-            return std::invoke(std::forward_like<Self>(vip), FWD(args)...);
-          }
-          else
-          {
-            return std::invoke(std::forward_like<Self>(vip), std::forward_like<Self>(c),
-                               FWD(args)...);
-          }
-        };
-      },
-      detail::argument_types_t<decltype(vip)>{});
+            if constexpr (std::is_function_v<std::remove_reference_t<C>>)
+            {
+              return std::invoke(std::forward_like<Self>(vip), FWD(args)...);
+            }
+            else
+            {
+              return std::invoke(std::forward_like<Self>(vip), std::forward_like<Self>(c),
+                                 FWD(args)...);
+            }
+          };
+        },
+        detail::argument_types_t<decltype(vip)>{});
+    }
   }
 
   /// @brief Creates a curried version of a function, enabling partial application.
