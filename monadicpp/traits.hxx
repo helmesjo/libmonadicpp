@@ -4,6 +4,7 @@
 
 #include <concepts>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 
 #define FWD(...) ::std::forward<decltype(__VA_ARGS__)>(__VA_ARGS__)
@@ -184,45 +185,21 @@ namespace fho::detail
 
   /// @brief Applies a trait to unpacked tuple types and additional arguments.
   template<template<typename...> typename Trait, typename Arg1, typename Tuple, typename... Rest>
-  struct applied_tuple
+  struct applied_tuple;
+
+  template<template<typename...> typename Trait, typename Arg1, typename... Bound, typename... Rest>
+  struct applied_tuple<Trait, Arg1, std::tuple<Bound...>, Rest...>
   {
-  private:
-    /// @brief Base case for unpacking: no more tuple elements to process.
-    /// @detailed When `I` equals `N`, all tuple elements have been unpacked into `Types...`.
-    ///           Applies `Trait` to `Arg1`, the unpacked `Types...`, and `Tail...`, yielding the
-    ///           final type.
-    template<typename A, typename... Tail, size_t I, size_t N, typename... Types>
-    static constexpr auto
-    deduce(std::index_sequence<I, N>, std::tuple<Types...>*) -> Trait<A, Types..., Tail...>
-    {
-      return {};
-    }
-
-    /// @brief Recursive case for unpacking tuple elements.
-    /// @detailed Extracts the `I`-th type from the tuple `T...`, appends it to `Types...`,
-    ///           and recursively processes the next element by incrementing `I` until `I`
-    ///           equals `N`.
-    template<typename A, typename... T, typename... Tail, size_t I, size_t N, typename... Types>
-      requires (N > 0)
-    static constexpr auto
-    deduce(std::index_sequence<I, N>, std::tuple<T..., Types...>*) -> decltype(auto)
-    {
-      using CurrentType = std::tuple_element_t<I, std::tuple<T...>>;
-      return deduce<A, Tail...>(std::index_sequence<I + 1, N>{},
-                                static_cast<std::tuple<Types..., CurrentType>*>(nullptr));
-    }
-
-  public:
-    /// @brief Resulting type after applying `Trait` to `Arg1`, unpacked `Tuple` types, and
-    ///        `Rest...`.
-    using type = decltype(deduce<Arg1, Rest...>(
-      std::index_sequence<0, std::tuple_size_v<std::remove_cvref_t<Tuple>>>{},
-      static_cast<std::remove_cvref_t<Tuple>*>(nullptr)));
+    using type                  = typename Trait<Arg1, Bound..., Rest...>::type; // NOLINT
+    static constexpr bool value = type::value;
   };
 
   /// @brief Applies `Tuple` & `Rest...` to `Trait`.
   template<template<typename...> typename Trait, typename Arg1, typename Tuple, typename... Rest>
   using applied_t = typename applied_tuple<Trait, Arg1, Tuple, Rest...>::type;
+
+  template<template<typename...> typename Trait, typename Arg1, typename Tuple, typename... Rest>
+  static constexpr auto applied_v = applied_t<Trait, Arg1, Tuple, Rest...>::value;
 
   /// TEST: Tuple applied to type trait.
   static_assert(
@@ -232,9 +209,10 @@ namespace fho::detail
       {
         return a;
       };
-      return std::same_as<int,
-                          applied_t<std::invoke_result_t, decltype(l), std::tuple<int, float&>>>;
+      return std::same_as<std::invoke_result_t<decltype(l), int, float&>,
+                          applied_t<std::invoke_result, decltype(l), std::tuple<int, float&>>>;
     }());
+
   static_assert(
     []
     {
@@ -242,8 +220,62 @@ namespace fho::detail
       {
         return a;
       };
-      return std::same_as<int,
-                          applied_t<std::invoke_result_t, decltype(l), std::tuple<int&>, float>>;
+      return std::same_as<std::invoke_result_t<decltype(l), int&, float>,
+                          applied_t<std::invoke_result, decltype(l), std::tuple<int&>, float>>;
+    }());
+
+  // Test 1: Void return type
+  static_assert(
+    []
+    {
+      constexpr auto l = [](int, float&) {};
+      return std::same_as<std::invoke_result_t<decltype(l), int, float&>,
+                          applied_t<std::invoke_result, decltype(l), std::tuple<int, float&>>>;
+    }());
+
+  // Test 2: Empty tuple
+  static_assert(
+    []
+    {
+      constexpr auto l = [](int)
+      {
+        return 42;
+      };
+      return std::same_as<std::invoke_result_t<decltype(l), int>,
+                          applied_t<std::invoke_result, decltype(l), std::tuple<>, int>>;
+    }());
+
+  // Test 3: Rvalue reference
+  static_assert(
+    []
+    {
+      constexpr auto l = []([[maybe_unused]] int&&, float)
+      {
+        return 42;
+      };
+      return std::same_as<std::invoke_result_t<decltype(l), int&&, float>,
+                          applied_t<std::invoke_result, decltype(l), std::tuple<int&&>, float>>;
+    }());
+
+  // Test 4: is_invocable trait
+  static_assert(
+    []
+    {
+      constexpr auto l = [](int, float) {};
+      return std::is_invocable_v<decltype(l), int, float> ==
+             applied_v<std::is_invocable, decltype(l), std::tuple<int>, float>;
+    }());
+
+  // Test 5: Non-invocable case
+  static_assert(
+    []
+    {
+      constexpr auto l = [](int, float) {};
+      // Use a non-convertible type, e.g., struct
+      struct x
+      {};
+      return std::is_invocable_v<decltype(l), int, x> ==
+             applied_v<std::is_invocable, decltype(l), std::tuple<int>, x>;
     }());
 }
 
