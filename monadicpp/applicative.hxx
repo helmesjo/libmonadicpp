@@ -15,6 +15,80 @@
 
 namespace fho
 {
+  template<promoted T, detail::tuple_like Bound, typename... Unbound>
+  struct curried
+  {
+    static_assert(detail::applied_v<std::is_invocable, T, Bound, Unbound...>,
+                  "Type not invocable with specified arguments");
+
+    using argument_types = std::tuple<Unbound...>;
+    using result_type    = detail::applied_t<std::invoke_result, T, Bound, Unbound...>;
+    using function_type  = result_type(Unbound...);
+
+    using full_signature_type =
+      detail::applied_t<detail::function_signature, result_type, Bound, Unbound...>;
+
+    static constexpr auto arity = sizeof...(Unbound);
+
+    constexpr explicit curried(T t, Bound b)
+      : obj_(std::move(t))
+      , bound_(std::move(b))
+    {}
+
+    template<typename Self, typename... Params>
+      requires (sizeof...(Params) <= arity) &&
+               pairwise<std::tuple<Params...>, std::is_convertible, std::tuple<Unbound...>>
+    constexpr auto
+    operator()([[maybe_unused]] this Self&& self, Params&&... args) -> decltype(auto)
+    {
+      // 1. determine if we have all required arguments ("saturated")
+      //    by unpacking ("apply") bound & unbound (arg) types
+      constexpr auto saturated = detail::applied_v<std::is_invocable, T, Bound, Params...>;
+
+      // 2. invoke if saturated.
+      if constexpr (saturated)
+      {
+        return std::apply(
+          [obj = std::forward_like<Self>(self.obj_)](auto&&... args) constexpr mutable
+          {
+            static_assert(std::invocable<T, decltype(args)...>,
+                          "library bug (1000): Partial application saturated, but not invocable.");
+            {
+              return std::invoke(std::forward_like<Self>(obj), FWD(args)...);
+            }
+          },
+          detail::tuple_concat(std::forward_like<Self>(self.bound_), FWD(args)...));
+      }
+      // 3. otherwise, "curry" the newly applied arguments and
+      //    return a new callable (`curried<...>`), retaining
+      //    the full signature.
+      else
+      {
+        static_assert(
+          arity >= sizeof...(Params),
+          "library bug (1000): Partial application not saturated, but attempting to apply "
+          "too many arguments.");
+
+        using unbound_t =
+          detail::subtuple_t<sizeof...(Params), arity - sizeof...(Params), argument_types>;
+
+        auto bound = detail::tuple_concat(std::forward_like<Self>(self.bound_), FWD(args)...);
+        return std::apply(
+          [obj   = std::forward_like<Self>(self.obj_),
+           bound = std::move(bound)]<typename... Remains>(Remains&&...) constexpr
+          {
+            return curried<T, decltype(bound), Remains...>(std::forward_like<Self>(obj),
+                                                           std::move(bound));
+          },
+          unbound_t{});
+      }
+    }
+
+  private:
+    T     obj_;
+    Bound bound_;
+  };
+
   /// @brief Promotes a callable into a first-class citizen with a fully resolved signature.
   /// @details Transforms a callable (function, functor, or member function pointer) into a
   /// first-class citizen by making it a value that can be passed, returned, or assigned and has a
@@ -36,10 +110,12 @@ namespace fho
     else
     {
       auto vip = detail::partial<Args...>::type(simpleton);
+      // unwrap the full signature (from tuple)
       return std::apply(
         [c   = FWD(simpleton),
          vip = std::move(vip)]<typename... Params>(Params&&...) constexpr mutable
         {
+          // return callable with fully resolved signature.
           return [c   = std::move(c),
                   vip = std::move(vip)]<typename Self>(this Self&&,
                                                        Params&&... args) constexpr -> decltype(auto)
@@ -91,7 +167,7 @@ namespace fho
   ///
   /// This approach enables applicative-style programming in C++, allowing functions to be partially
   /// applied and composed, much like Haskell's functional paradigm.
-  template<typename F, typename... Args>
+  template<promoted F, typename... Args>
   constexpr auto
   curry(F&& f, Args&&... args) -> decltype(auto)
   {
@@ -111,7 +187,6 @@ namespace fho
                requires (sizeof...(As) > 0 && (sizeof...(As) <= detail::arity<F>)) &&
                         pairwise<std::tuple<Args...>, std::is_convertible,
                                  std::tuple<detail::match_any, As...>>
-
       {
         /// 4.
         return curry(std::forward_like<Self>(f), std::forward_like<Self>(args)...,

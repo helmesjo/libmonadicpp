@@ -22,6 +22,25 @@ namespace fho::detail
     static constexpr auto arity = sizeof...(Args);
   };
 
+  /// @brief Specialization where `T` has expected aliases.
+  template<typename T>
+    requires requires {
+               typename std::remove_cvref_t<T>::function_type;
+               typename std::remove_cvref_t<T>::argument_types;
+               typename std::remove_cvref_t<T>::result_type;
+               std::remove_cvref_t<T>::arity;
+             }
+  struct function_signature<T>
+  {
+    using type           = typename std::remove_reference_t<T>::function_type;
+    using argument_types = typename std::remove_reference_t<T>::argument_types;
+
+    template<auto I>
+    using argument_type_t = std::tuple_element_t<I, argument_types>;
+
+    static constexpr auto arity = std::remove_reference_t<T>::arity;
+  };
+
   /// @brief Specialization for callables (lambdas, functors with operator()).
   template<typename T>
     requires requires { &std::remove_cvref_t<T>::operator(); } &&
