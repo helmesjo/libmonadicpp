@@ -15,7 +15,7 @@
 
 namespace fho
 {
-  template<promoted T, detail::tuple_like Bound, typename... Unbound>
+  template<promoted T, typename Bound, typename... Unbound>
   struct curried
   {
     static_assert(detail::applied_v<std::is_invocable, T, Bound, Unbound...>,

@@ -84,7 +84,7 @@ namespace fho::detail
 /// @brief Test suite for tuple_subtypes and related utilities.
 /// @details Contains static assertions for various valid cases of subtuple extraction,
 ///          checking both the type trait and the make_subtuple function.
-namespace fho::detail::tests
+namespace fho::detail::tests::subtuple
 {
   namespace
   {

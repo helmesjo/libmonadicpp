@@ -2,6 +2,7 @@
 
 #include <monadicpp/detail/func_traits.hxx>
 #include <monadicpp/detail/traits/subtuple.hxx>
+#include <monadicpp/detail/traits/tuple_cat.hxx>
 
 #include <concepts>
 #include <tuple>
@@ -51,53 +52,6 @@ namespace fho::detail
 
   template<typename T, typename... Computations>
   using signature_t = typename detail::signature<T, Computations...>::type;
-
-  /// @brief Concept to detect tuple-like types.
-  template<typename T>
-  concept tuple_like = requires { typename std::tuple_size<std::remove_cvref_t<T>>::type; };
-
-  /// @brief Tuple concatination.
-  /// @param tp1 First tuple.
-  /// @param types Variadic arguments (non-empty).
-  template<typename... Types>
-    requires (sizeof...(Types) > 0 && !tuple_like<std::tuple_element_t<0, std::tuple<Types...>>>)
-  constexpr auto
-  tuple_concat(tuple_like auto&& tp, Types&&... types)
-  {
-    return std::tuple_cat(FWD(tp), std::tuple<Types...>(FWD(types)...));
-  }
-
-  /// @brief Tuple concatination.
-  /// @param tp1 First tuple.
-  /// @param types Variadic arguments (non-empty).
-  constexpr auto
-  tuple_concat(tuple_like auto&& tp)
-  {
-    return FWD(tp);
-  }
-
-  /// @brief Tuple concatination.
-  /// @param tp1 First tuple.
-  /// @param tp2 Second tuple.
-  constexpr auto
-  tuple_concat(tuple_like auto&& tp1, tuple_like auto&& tp2)
-  {
-    return std::tuple_cat(FWD(tp1), FWD(tp2));
-  }
-
-  /// @brief Concatenated tuple type of `Tuple` and `Types...`.
-  /// @detailed `Types...` is a tuple-like or variadic types.
-  template<typename Tuple, typename... Types>
-  using tuple_concat_t = decltype(tuple_concat(std::declval<Tuple>(), std::declval<Types>()...));
-
-  /// TEST: Tuple concatination
-  static_assert(
-    std::same_as<std::tuple<int, float>, tuple_concat_t<std::tuple<int, float>, std::tuple<>>>);
-  static_assert(std::same_as<std::tuple<int, float>, tuple_concat_t<std::tuple<int, float>>>);
-  static_assert(std::same_as<std::tuple<int, float, double, int>,
-                             tuple_concat_t<std::tuple<int, float>, double, int>>);
-  static_assert(std::same_as<std::tuple<int, float, double, int>,
-                             tuple_concat_t<std::tuple<int, float>, std::tuple<double, int>>>);
 
   /// @brief Applies a trait to unpacked tuple types and additional arguments.
   template<template<typename...> typename Trait, typename Arg1, typename Tuple, typename... Rest>
