@@ -1,6 +1,7 @@
 #pragma once
 
 #include <monadicpp/detail/func_traits.hxx>
+#include <monadicpp/detail/traits/applied_tuple.hxx>
 #include <monadicpp/detail/traits/subtuple.hxx>
 #include <monadicpp/detail/traits/tuple_cat.hxx>
 
@@ -52,101 +53,6 @@ namespace fho::detail
 
   template<typename T, typename... Computations>
   using signature_t = typename detail::signature<T, Computations...>::type;
-
-  /// @brief Applies a trait to unpacked tuple types and additional arguments.
-  template<template<typename...> typename Trait, typename Arg1, typename Tuple, typename... Rest>
-  struct applied_tuple;
-
-  template<template<typename...> typename Trait, typename Arg1, typename... Bound, typename... Rest>
-  struct applied_tuple<Trait, Arg1, std::tuple<Bound...>, Rest...>
-  {
-    using type                  = typename Trait<Arg1, Bound..., Rest...>::type; // NOLINT
-    static constexpr bool value = type::value;
-  };
-
-  /// @brief Applies `Tuple` & `Rest...` to `Trait`.
-  template<template<typename...> typename Trait, typename Arg1, typename Tuple, typename... Rest>
-  using applied_t = typename applied_tuple<Trait, Arg1, Tuple, Rest...>::type;
-
-  template<template<typename...> typename Trait, typename Arg1, typename Tuple, typename... Rest>
-  static constexpr auto applied_v = applied_t<Trait, Arg1, Tuple, Rest...>::value;
-
-  /// TEST: Tuple applied to type trait.
-  static_assert(
-    []
-    {
-      constexpr auto l = [](auto a, float&)
-      {
-        return a;
-      };
-      return std::same_as<std::invoke_result_t<decltype(l), int, float&>,
-                          applied_t<std::invoke_result, decltype(l), std::tuple<int, float&>>>;
-    }());
-
-  static_assert(
-    []
-    {
-      constexpr auto l = [](auto& a, float)
-      {
-        return a;
-      };
-      return std::same_as<std::invoke_result_t<decltype(l), int&, float>,
-                          applied_t<std::invoke_result, decltype(l), std::tuple<int&>, float>>;
-    }());
-
-  // Test 1: Void return type
-  static_assert(
-    []
-    {
-      constexpr auto l = [](int, float&) {};
-      return std::same_as<std::invoke_result_t<decltype(l), int, float&>,
-                          applied_t<std::invoke_result, decltype(l), std::tuple<int, float&>>>;
-    }());
-
-  // Test 2: Empty tuple
-  static_assert(
-    []
-    {
-      constexpr auto l = [](int)
-      {
-        return 42;
-      };
-      return std::same_as<std::invoke_result_t<decltype(l), int>,
-                          applied_t<std::invoke_result, decltype(l), std::tuple<>, int>>;
-    }());
-
-  // Test 3: Rvalue reference
-  static_assert(
-    []
-    {
-      constexpr auto l = []([[maybe_unused]] int&&, float)
-      {
-        return 42;
-      };
-      return std::same_as<std::invoke_result_t<decltype(l), int&&, float>,
-                          applied_t<std::invoke_result, decltype(l), std::tuple<int&&>, float>>;
-    }());
-
-  // Test 4: is_invocable trait
-  static_assert(
-    []
-    {
-      constexpr auto l = [](int, float) {};
-      return std::is_invocable_v<decltype(l), int, float> ==
-             applied_v<std::is_invocable, decltype(l), std::tuple<int>, float>;
-    }());
-
-  // Test 5: Non-invocable case
-  static_assert(
-    []
-    {
-      constexpr auto l = [](int, float) {};
-      // Use a non-convertible type, e.g., struct
-      struct x
-      {};
-      return std::is_invocable_v<decltype(l), int, x> ==
-             applied_v<std::is_invocable, decltype(l), std::tuple<int>, x>;
-    }());
 }
 
 /// @brief Specializations of `tuple_element_t` & `tuple_size_v` for `monad_signature`.
