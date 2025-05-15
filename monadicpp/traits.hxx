@@ -1,6 +1,7 @@
 #pragma once
 
 #include <monadicpp/detail/func_traits.hxx>
+#include <monadicpp/detail/traits/subtuple.hxx>
 
 #include <concepts>
 #include <tuple>
@@ -50,91 +51,6 @@ namespace fho::detail
 
   template<typename T, typename... Computations>
   using signature_t = typename detail::signature<T, Computations...>::type;
-
-  /// @brief Type trait to extract a subtuple from a tuple starting at Offset with Count elements.
-  /// @tparam Offset Starting index of the subtuple.
-  /// @tparam Count Number of elements in the subtuple.
-  /// @tparam Ts Types in the input tuple.
-  template<size_t Offset, size_t Count, typename... Ts>
-  struct tuple_subtypes;
-
-  /// @brief Specialization for tuple input.
-  /// @tparam Offset Starting index.
-  /// @tparam Count Number of elements.
-  /// @tparam Ts Types in the tuple.
-  /// @note Static assert ensures Offset + Count does not exceed tuple size.
-  template<size_t Offset, size_t Count, typename... Ts>
-  struct tuple_subtypes<Offset, Count, std::tuple<Ts...>>
-  {
-    static_assert(Offset + Count <= sizeof...(Ts), "Offset + Count exceeds tuple size");
-
-    /// @brief Helper to create subtuple type from index sequence.
-    /// @tparam Is Index sequence for subtuple elements.
-    template<size_t... Is>
-    static constexpr auto make_subtuple(std::index_sequence<Is...>)
-      -> std::tuple<std::tuple_element_t<Offset + Is, std::tuple<Ts...>>...>;
-
-    template<size_t... Is>
-    static constexpr auto
-    make_subtuple(std::index_sequence<Is...>, std::tuple<Ts...> outerTuple)
-      -> std::tuple<std::tuple_element_t<Offset + Is, std::tuple<Ts...>>...>
-    {
-      return std::forward_as_tuple(std::get<Offset + Is>(FWD(outerTuple))...);
-    }
-
-    /// @brief Resulting subtuple type.
-    using type = decltype(make_subtuple(std::make_index_sequence<Count>{}));
-  };
-
-  /// @brief Alias for accessing subtuple type.
-  /// @tparam Offset Starting index.
-  /// @tparam Count Number of elements.
-  /// @tparam T Input tuple type.
-  template<size_t Offset, size_t Count, typename T>
-  using subtuple_t = typename tuple_subtypes<Offset, Count, T>::type;
-
-  template<size_t Offset, size_t Count, typename T>
-  constexpr auto
-  make_subtuple(T&& tp)
-  {
-    return tuple_subtypes<Offset, Count, T>::make_subtuple(std::make_index_sequence<Count>{},
-                                                           FWD(tp));
-  }
-
-  template<size_t Offset, size_t Count, typename... Ts>
-  constexpr auto
-  forward_as_subtuple(Ts&&... ts)
-  {
-    return make_subtuple<Offset, Count>(std::forward_as_tuple(FWD(ts)...));
-  }
-
-  /// TEST: Sub-tuple
-  static_assert(std::same_as<std::tuple<int>, subtuple_t<0, 1, std::tuple<int, float, double>>>);
-  static_assert(std::same_as<std::tuple<double>, subtuple_t<2, 1, std::tuple<int, float, double>>>);
-  static_assert(std::same_as<std::tuple<float>, subtuple_t<1, 1, std::tuple<int, float, double>>>);
-  static_assert(
-    std::same_as<std::tuple<int, float, double>, subtuple_t<0, 3, std::tuple<int, float, double>>>);
-  static_assert(
-    std::same_as<std::tuple<float, double>, subtuple_t<1, 2, std::tuple<int, float, double>>>);
-
-  static_assert(
-    []
-    {
-      constexpr auto sub = make_subtuple<0, 3>(std::tuple<int, char, long>{1, 2, 3});
-      return std::get<0>(sub) == 1 && std::get<1>(sub) == 2 && std::get<2>(sub) == 3;
-    }());
-  static_assert(
-    []
-    {
-      constexpr auto sub = make_subtuple<1, 1>(std::tuple<int, char, long>{1, 2, 3});
-      return std::get<0>(sub) == 2;
-    }());
-  static_assert(
-    []
-    {
-      constexpr auto sub = make_subtuple<2, 1>(std::tuple<int, char, long>{1, 2, 3});
-      return std::get<0>(sub) == 3;
-    }());
 
   /// @brief Concept to detect tuple-like types.
   template<typename T>
