@@ -219,301 +219,184 @@ namespace fho::detail::tests::disambiguate
   /// @test Free Functions
   /// @brief No ambiguity with all arguments inferred.
   static_assert(
-    [] -> bool
-    {
-      using expected_t = int (*)(int, double);
-      auto result      = partial<int, double>::type(free_func);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
+    std::is_same_v<int (*)(int, double), decltype(partial<int, double>::type(free_func))>,
     "No ambiguity with all arguments inferred");
 
   /// @test Free Functions
   /// @brief No ambiguity with all arguments explicit.
   static_assert(
-    [] -> bool
-    {
-      using expected_t = int (*)(int, double);
-      auto result      = partial<int, double>::type(free_func);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
+    std::is_same_v<int (*)(int, double), decltype(partial<int, double>::type(free_func))>,
     "No ambiguity with all arguments explicit");
 
   /// @test Free Functions
   /// @brief No ambiguity with first argument explicit, rest inferred.
-  static_assert(
-    [] -> bool
-    {
-      using expected_t = int (*)(int, double);
-      auto result      = partial<int>::type(free_func);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
-    "No ambiguity with first argument explicit, rest inferred");
+  static_assert(std::is_same_v<int (*)(int, double), decltype(partial<int>::type(free_func))>,
+                "No ambiguity with first argument explicit, rest inferred");
 
   /// @test Free Functions
   /// @brief Ambiguity with all arguments inferred (expects failure).
   static_assert(
-    [] -> bool
-    {
-      // No instantiation of partial<> to cause ambiguity
-      return true; // Note: This would fail to compile if partial<> was used
-    }(),
+    // No instantiation of partial<> to cause ambiguity
+    true // Note: This would fail to compile if partial<> was used
+    ,
     "Ambiguity with all arguments inferred (expects failure)");
 
   /// @test Free Functions
   /// @brief Ambiguity with all arguments explicit.
   static_assert(
-    [] -> bool
-    {
-      using expected_t = int (*)(int, double);
-      auto result      = partial<int, double>::type(free_func);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
+    std::is_same_v<int (*)(int, double), decltype(partial<int, double>::type(free_func))>,
     "Ambiguity with all arguments explicit");
 
   /// @test Free Functions
   /// @brief Ambiguity with first argument explicit, rest inferred.
-  static_assert(
-    [] -> bool
-    {
-      using expected_t = int (*)(int, double);
-      auto result      = partial<int>::type(free_func);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
-    "Ambiguity with first argument explicit, rest inferred");
+  static_assert(std::is_same_v<int (*)(int, double), decltype(partial<int>::type(free_func))>,
+                "Ambiguity with first argument explicit, rest inferred");
 
   /// @test Free Functions
   /// @brief Ambiguity with not enough arguments explicit, can't infer rest (expects failure).
   static_assert(
-    [] -> bool
-    {
-      // partial<> with no arguments would fail to resolve
-      return true; // Note: This would fail to compile if partial<> was used
-    }(),
+    // partial<> with no arguments would fail to resolve
+    true // Note: This would fail to compile if partial<> was used
+    ,
     "Ambiguity with not enough arguments explicit, can't infer rest (expects failure)");
 
   /// @test Non-const Member Functions
   /// @brief No ambiguity with all arguments inferred.
   static_assert(
-    [] -> bool
-    {
-      using expected_t = int (test_struct::*)(int, double);
-      auto result      = partial<int, double>::type(&test_struct::non_const_member);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
+    std::is_same_v<int (test_struct::*)(int, double),
+                   decltype(partial<int, double>::type(&test_struct::non_const_member))>,
     "No ambiguity with all arguments inferred");
 
   /// @test Non-const Member Functions
   /// @brief No ambiguity with all arguments explicit.
   static_assert(
-    [] -> bool
-    {
-      using expected_t = int (test_struct::*)(int, double);
-      auto result      = partial<int, double>::type(&test_struct::non_const_member);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
+    std::is_same_v<int (test_struct::*)(int, double),
+                   decltype(partial<int, double>::type(&test_struct::non_const_member))>,
     "No ambiguity with all arguments explicit");
 
   /// @test Non-const Member Functions
   /// @brief No ambiguity with first argument explicit, rest inferred.
-  static_assert(
-    [] -> bool
-    {
-      using expected_t = int (test_struct::*)(int, double);
-      auto result      = partial<int>::type(&test_struct::non_const_member);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
-    "No ambiguity with first argument explicit, rest inferred");
+  static_assert(std::is_same_v<int (test_struct::*)(int, double),
+                               decltype(partial<int>::type(&test_struct::non_const_member))>,
+                "No ambiguity with first argument explicit, rest inferred");
 
   /// @test Non-const Member Functions
   /// @brief Ambiguity with all arguments inferred (expects failure).
   static_assert(
-    [] -> bool
-    {
-      // No instantiation of partial<> to cause ambiguity
-      return true; // Note: This would fail to compile if partial<> was used
-    }(),
+    // No instantiation of partial<> to cause ambiguity
+    true // Note: This would fail to compile if partial<> was used
+    ,
     "Ambiguity with all arguments inferred (expects failure)");
 
   /// @test Non-const Member Functions
   /// @brief Ambiguity with all arguments explicit.
   static_assert(
-    [] -> bool
-    {
-      using expected_t = int (test_struct::*)(int, double);
-      auto result      = partial<int, double>::type(&test_struct::non_const_member);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
+    std::is_same_v<int (test_struct::*)(int, double),
+                   decltype(partial<int, double>::type(&test_struct::non_const_member))>,
     "Ambiguity with all arguments explicit");
 
   /// @test Non-const Member Functions
   /// @brief Ambiguity with first argument explicit, rest inferred.
-  static_assert(
-    [] -> bool
-    {
-      using expected_t = int (test_struct::*)(int, double);
-      auto result      = partial<int>::type(&test_struct::non_const_member);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
-    "Ambiguity with first argument explicit, rest inferred");
+  static_assert(std::is_same_v<int (test_struct::*)(int, double),
+                               decltype(partial<int>::type(&test_struct::non_const_member))>,
+                "Ambiguity with first argument explicit, rest inferred");
 
   /// @test Non-const Member Functions
   /// @brief Ambiguity with not enough arguments explicit, can't infer rest (expects failure).
   static_assert(
-    [] -> bool
-    {
-      // partial<> with no arguments would fail to resolve
-      return true; // Note: This would fail to compile if partial<> was used
-    }(),
+    // partial<> with no arguments would fail to resolve
+    true // Note: This would fail to compile if partial<> was used
+    ,
     "Ambiguity with not enough arguments explicit, can't infer rest (expects failure)");
 
   // Const member function tests
   /// @test Const Member Functions
   /// @brief No ambiguity with all arguments inferred.
-  static_assert(
-    [] -> bool
-    {
-      using expected_t = int (test_struct::*)(int, double) const;
-      auto result      = partial<int, double>::type(&test_struct::const_member);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
-    "No ambiguity with all arguments inferred");
+  static_assert(std::is_same_v<int (test_struct::*)(int, double) const,
+                               decltype(partial<int, double>::type(&test_struct::const_member))>,
+                "No ambiguity with all arguments inferred");
 
   /// @test Const Member Functions
   /// @brief No ambiguity with all arguments explicit.
-  static_assert(
-    [] -> bool
-    {
-      using expected_t = int (test_struct::*)(int, double) const;
-      auto result      = partial<int, double>::type(&test_struct::const_member);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
-    "No ambiguity with all arguments explicit");
+  static_assert(std::is_same_v<int (test_struct::*)(int, double) const,
+                               decltype(partial<int, double>::type(&test_struct::const_member))>,
+                "No ambiguity with all arguments explicit");
 
   /// @test Const Member Functions
   /// @brief No ambiguity with first argument explicit, rest inferred.
-  static_assert(
-    [] -> bool
-    {
-      using expected_t = int (test_struct::*)(int, double) const;
-      auto result      = partial<int>::type(&test_struct::const_member);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
-    "No ambiguity with first argument explicit, rest inferred");
+  static_assert(std::is_same_v<int (test_struct::*)(int, double) const,
+                               decltype(partial<int>::type(&test_struct::const_member))>,
+                "No ambiguity with first argument explicit, rest inferred");
 
   /// @test Const Member Functions
   /// @brief Ambiguity with all arguments inferred (expects failure).
   static_assert(
-    [] -> bool
-    {
-      // No instantiation of partial<> to cause ambiguity
-      return true; // Note: This would fail to compile if partial<> was used
-    }(),
+    // No instantiation of partial<> to cause ambiguity
+    true // Note: This would fail to compile if partial<> was used
+    ,
     "Ambiguity with all arguments inferred (expects failure)");
 
   /// @test Const Member Functions
   /// @brief Ambiguity with all arguments explicit.
-  static_assert(
-    [] -> bool
-    {
-      using expected_t = int (test_struct::*)(int, double) const;
-      auto result      = partial<int, double>::type(&test_struct::const_member);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
-    "Ambiguity with all arguments explicit");
+  static_assert(std::is_same_v<int (test_struct::*)(int, double) const,
+                               decltype(partial<int, double>::type(&test_struct::const_member))>,
+                "Ambiguity with all arguments explicit");
 
   /// @test Const Member Functions
   /// @brief Ambiguity with first argument explicit, rest inferred.
-  static_assert(
-    [] -> bool
-    {
-      using expected_t = int (test_struct::*)(int, double) const;
-      auto result      = partial<int>::type(&test_struct::const_member);
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
-    "Ambiguity with first argument explicit, rest inferred");
+  static_assert(std::is_same_v<int (test_struct::*)(int, double) const,
+                               decltype(partial<int>::type(&test_struct::const_member))>,
+                "Ambiguity with first argument explicit, rest inferred");
 
   /// @test Const Member Functions
   /// @brief Ambiguity with not enough arguments explicit, can't infer rest (expects failure).
   static_assert(
-    [] -> bool
-    {
-      // partial<> with no arguments would fail to resolve
-      return true; // Note: This would fail to compile if partial<> was used
-    }(),
+    // partial<> with no arguments would fail to resolve
+    true // Note: This would fail to compile if partial<> was used
+    ,
     "Ambiguity with not enough arguments explicit, can't infer rest (expects failure)");
 
   // Callable object tests
   /// @test Callable Objects
   /// @brief No ambiguity with all arguments inferred.
-  static_assert(
-    [] -> bool
-    {
-      using expected_t = int (callable::*)(int, double);
-      auto result      = partial<int, double>::type(callable{});
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
-    "No ambiguity with all arguments inferred");
+  static_assert(std::is_same_v<int (callable::*)(int, double),
+                               decltype(partial<int, double>::type(callable{}))>,
+                "No ambiguity with all arguments inferred");
 
   /// @test Callable Objects
   /// @brief No ambiguity with all arguments explicit.
-  static_assert(
-    [] -> bool
-    {
-      using expected_t = int (callable::*)(int, double);
-      auto result      = partial<int, double>::type(callable{});
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
-    "No ambiguity with all arguments explicit");
+  static_assert(std::is_same_v<int (callable::*)(int, double),
+                               decltype(partial<int, double>::type(callable{}))>,
+                "No ambiguity with all arguments explicit");
 
   /// @test Callable Objects
   /// @brief No ambiguity with first argument explicit, rest inferred.
   static_assert(
-    [] -> bool
-    {
-      using expected_t = int (callable::*)(int, double);
-      auto result      = partial<int>::type(callable{});
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
+    std::is_same_v<int (callable::*)(int, double), decltype(partial<int>::type(callable{}))>,
     "No ambiguity with first argument explicit, rest inferred");
 
   /// @test Callable Objects
   /// @brief Ambiguity with all arguments inferred (expects failure).
   static_assert(
-    [] -> bool
-    {
-      // No instantiation of partial<> to cause ambiguity
-      return true; // Note: This would fail to compile if partial<> was used
-    }(),
+    // No instantiation of partial<> to cause ambiguity
+    true // Note: This would fail to compile if partial<> was used
+    ,
     "Ambiguity with all arguments inferred (expects failure)");
 
   /// @test Callable Objects
   /// @brief Ambiguity with all arguments explicit.
-  static_assert(
-    [] -> bool
-    {
-      using expected_t = int (callable::*)(int, double);
-      auto result      = partial<int, double>::type(callable{});
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
-    "Ambiguity with all arguments explicit");
+  static_assert(std::is_same_v<int (callable::*)(int, double),
+                               decltype(partial<int, double>::type(callable{}))>,
+                "Ambiguity with all arguments explicit");
 
   /// @test Callable Objects
   /// @brief Ambiguity with first argument explicit, rest inferred.
   static_assert(
-    [] -> bool
-    {
-      using expected_t = int (callable::*)(int, double);
-      auto result      = partial<int>::type(callable{});
-      return std::is_same_v<expected_t, decltype(result)>;
-    }(),
+    std::is_same_v<int (callable::*)(int, double), decltype(partial<int>::type(callable{}))>,
     "Ambiguity with first argument explicit, rest inferred");
 
   /// @test Callable Objects
   /// @brief Ambiguity with not enough arguments explicit, can't infer rest (expects failure).
-  static_assert(
-    [] -> bool
-    {
-      return !can_deduce<callable>;
-    }(),
-    "Ambiguity with not enough arguments explicit, can't infer rest (expects failure)");
+  static_assert(!can_deduce<callable>,
+                "Ambiguity with not enough arguments explicit, can't infer rest (expects failure)");
 }
