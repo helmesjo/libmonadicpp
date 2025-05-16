@@ -69,7 +69,7 @@ namespace std
   {};
 }
 
-namespace fho::detail
+namespace fho::detail::tests::signature
 {
   /// TEST: Signature Composition
   static_assert(std::same_as<monad_signature<int(), float()>, signature_t<int(), float()>>);

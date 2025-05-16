@@ -15,37 +15,76 @@
 
 namespace fho
 {
+  /// @brief A curried function object for partial application of arguments.
+  /// @tparam T The type of the callable object.
+  /// @tparam Bound The type of the tuple holding bound arguments.
+  /// @tparam Unbound The types of the remaining unbound arguments.
   template<promoted T, typename Bound, typename... Unbound>
   struct curried
   {
-    static_assert(detail::applied_v<std::is_invocable, T, Bound, Unbound...>,
-                  "Type not invocable with specified arguments");
-
+    /// @brief The types of the unbound arguments.
     using argument_types = std::tuple<Unbound...>;
-    using result_type    = detail::applied_t<std::invoke_result, T, Bound, Unbound...>;
-    using function_type  = result_type(Unbound...);
 
+    /// @brief The result type when the function is fully applied.
+    using result_type = detail::applied_t<std::invoke_result, T, Bound, Unbound...>;
+
+    /// @brief The function type for the applied function.
+    using function_type = result_type(Unbound...);
+
+    /// @brief The full signature type, including bound and unbound arguments.
     using full_signature_type =
       detail::applied_t<detail::function_signature, result_type, Bound, Unbound...>;
 
+    /// @brief The number of unbound arguments.
     static constexpr auto arity = sizeof...(Unbound);
 
+    /// @brief Constructs a curried object with the given callable and bound arguments.
+    /// @param t The callable object.
+    /// @param b The tuple of bound arguments.
     constexpr explicit curried(T t, Bound b)
       : obj_(std::move(t))
       , bound_(std::move(b))
     {}
 
+    /// @brief Applies provided arguments to the curried function.
+    /// @tparam Self The type of the curried object (deduced).
+    /// @tparam Params The types of the provided arguments.
+    /// @param self The curried object (lvalue or rvalue).
+    /// @param args The arguments to apply.
+    /// @return If all arguments are provided, the result of invoking the callable.
+    ///         Otherwise, a new curried object with additional bound arguments.
+    /// @details
+    /// The call operator checks if the provided arguments, combined with the bound arguments,
+    /// are sufficient to invoke the callable (saturation). Saturation is determined by
+    /// `detail::applied_v<std::is_invocable, T, Bound, Params...>`, which unpacks the bound
+    /// tuple and checks invocability with the provided arguments. If saturated, the operator:
+    /// 1. Concatenates the bound arguments (`self.bound_`) with the provided arguments (`args`)
+    ///    using `detail::tuple_concat`, preserving value categories via `std::forward_like`.
+    /// 2. Uses `std::apply` to unpack the concatenated tuple and invoke the callable (`self.obj_`)
+    ///    via `std::invoke`, forwarding arguments and the callable with correct value categories.
+    ///    A static assert ensures invocability, guarding against library bugs.
+    /// If not saturated, the operator:
+    /// 1. Computes the remaining unbound argument types using `detail::subtuple_t`, extracting
+    ///    a subtuple of `argument_types` starting at the number of provided arguments.
+    /// 2. Concatenates the bound and provided arguments into a new bound tuple.
+    /// 3. Uses `std::apply` to construct a new `curried` object with the updated bound tuple
+    ///    and remaining unbound types, deduced from the subtuple.
+    /// The implementation supports constexpr evaluation, perfect forwarding with
+    /// `std::forward_like`, and enforces type convertibility via the `pairwise` constraint.
+    /// @example
+    /// ```c++
+    /// int add(int a, int b) { return a + b; }
+    /// auto curried_add = curried<decltype(add), std::tuple<>, int, int>(add, std::tuple<>());
+    /// auto partial = curried_add(5); // curried<decltype(add), std::tuple<int>, int>
+    /// auto result = partial(3); // result is 8
+    /// ```
     template<typename Self, typename... Params>
       requires (sizeof...(Params) <= arity) &&
                pairwise<std::tuple<Params...>, std::is_convertible, std::tuple<Unbound...>>
     constexpr auto
     operator()([[maybe_unused]] this Self&& self, Params&&... args) -> decltype(auto)
     {
-      // 1. determine if we have all required arguments ("saturated")
-      //    by unpacking ("apply") bound & unbound (arg) types
       constexpr auto saturated = detail::applied_v<std::is_invocable, T, Bound, Params...>;
-
-      // 2. invoke if saturated.
       if constexpr (saturated)
       {
         return std::apply(
@@ -53,25 +92,18 @@ namespace fho
           {
             static_assert(std::invocable<T, decltype(args)...>,
                           "library bug (1000): Partial application saturated, but not invocable.");
-            {
-              return std::invoke(std::forward_like<Self>(obj), FWD(args)...);
-            }
+            return std::invoke(std::forward_like<Self>(obj), FWD(args)...);
           },
           detail::tuple_concat(std::forward_like<Self>(self.bound_), FWD(args)...));
       }
-      // 3. otherwise, "curry" the newly applied arguments and
-      //    return a new callable (`curried<...>`), retaining
-      //    the full signature.
       else
       {
         static_assert(
           arity >= sizeof...(Params),
-          "library bug (1000): Partial application not saturated, but attempting to apply "
+          "library bug (1001): Partial application not saturated, but attempting to apply "
           "too many arguments.");
-
         using unbound_t =
           detail::subtuple_t<sizeof...(Params), arity - sizeof...(Params), argument_types>;
-
         auto bound = detail::tuple_concat(std::forward_like<Self>(self.bound_), FWD(args)...);
         return std::apply(
           [obj   = std::forward_like<Self>(self.obj_),
@@ -85,8 +117,8 @@ namespace fho
     }
 
   private:
-    T     obj_;
-    Bound bound_;
+    T     obj_;   ///< The callable object.
+    Bound bound_; ///< The tuple of bound arguments.
   };
 
   /// @brief Promotes a callable into a first-class citizen with a fully resolved signature.
@@ -99,6 +131,13 @@ namespace fho
   /// pointer).
   /// @param `simpleton` The callable to transform into a first-class citizen.
   /// @return A new callable that is a first-class citizen with a fully resolved signature.
+  /// @example
+  /// ```c++
+  /// auto add(int a, int b)   -> int { return a + b; }
+  /// auto add(float a, int b) -> int { return a + b; }
+  /// auto p = promote<int>(add); // disambiguate overloads, pick add(int,int)
+  /// auto result = p(5, 6);      // add(5,6) -> 11
+  /// ```
   template<typename... Args, std::move_constructible C>
   constexpr auto
   promote(C&& simpleton)
