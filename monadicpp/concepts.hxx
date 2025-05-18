@@ -41,7 +41,7 @@ namespace fho
     struct null_functor
     {
       using value_type = T;
-      constexpr auto fmap(auto&&) const -> null_monad<std::remove_cvref_t<T>>;
+      constexpr auto fmap(auto&&) const -> null_monad<std::remove_reference_t<T>>;
     };
 
     /// @brief A null monadic function.
@@ -50,7 +50,7 @@ namespace fho
     {
       template<typename T>
       constexpr auto
-      operator()(T&&) const -> null_monad<std::remove_cvref_t<T>>
+      operator()(T&&) const -> null_monad<std::remove_reference_t<T>>
       {
         return {};
       }
@@ -135,14 +135,12 @@ namespace fho
   /// @details Ensures type `T` has a value type, supports map and bind operations, and provides a
   /// value extraction method.
   template<typename T>
-  concept monadic =
-    requires (T&& t) {
-      typename std::remove_cvref_t<T>::value_type;
-      t.fmap(
-        std::declval<detail::null_pure_func<int, typename std::remove_cvref_t<T>::value_type>>());
-      t.bind(std::declval<detail::null_monadic_func>());
-      { t.value() } -> std::convertible_to<typename std::remove_cvref_t<T>::value_type>;
-    };
+  concept monadic = requires (T&& t, typename std::remove_reference_t<T>::value_type v) {
+                      typename std::remove_reference_t<T>::value_type;
+                      t.fmap(std::declval<detail::null_pure_func<int, decltype(v)>>());
+                      t.bind(std::declval<detail::null_monadic_func>());
+                      { t.value() } -> std::common_with<decltype(v)>;
+                    };
 
   /// @brief Simple negation of `monadic` concept.
   template<typename T>
@@ -175,17 +173,16 @@ namespace fho
                         };
 
   template<typename F, typename M>
-  concept mappable = pure_func<F, typename std::remove_cvref_t<M>::value_type>;
+  concept mappable = pure_func<F, typename std::remove_reference_t<M>::value_type>;
 
   template<typename F, typename M>
-  concept bindable = requires (F&& f) {
-                       {
-                         FWD(f)(std::declval<typename std::remove_cvref_t<M>::value_type>())
-                       } -> monadic;
+  concept bindable = requires (F&& f, typename std::remove_reference_t<M>::value_type t) {
+                       { FWD(f)(t) } -> monadic;
                      };
 
   template<typename MF, typename M>
-  concept applicative = functor<MF> && mappable<M, typename std::remove_cvref_t<MF>::value_type>;
+  concept applicative =
+    functor<MF> && mappable<M, typename std::remove_reference_t<MF>::value_type>;
 
   /// @brief Concept for invocable types considered first-class citizens.
   /// @details Checks if `T` is an un-ambiguous callable (single signature, no overload ambiguity).

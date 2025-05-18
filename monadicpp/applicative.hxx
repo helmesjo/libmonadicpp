@@ -236,7 +236,7 @@ namespace fho
   {
     template<typename F, typename... Args>
     using curry_t =
-      std::remove_cvref_t<decltype(curry(std::declval<F>(), std::declval<Args>()...))>;
+      std::remove_reference_t<decltype(curry(std::declval<F>(), std::declval<Args>()...))>;
   }
 
   /// @brief TEST: Direct & indirect (full) invocation.

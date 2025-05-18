@@ -25,10 +25,10 @@ namespace fho::detail
   /// @brief Specialization where `T` has expected aliases.
   template<typename T>
     requires requires {
-               typename std::remove_cvref_t<T>::function_type;
-               typename std::remove_cvref_t<T>::argument_types;
-               typename std::remove_cvref_t<T>::result_type;
-               std::remove_cvref_t<T>::arity;
+               typename std::remove_reference_t<T>::function_type;
+               typename std::remove_reference_t<T>::argument_types;
+               typename std::remove_reference_t<T>::result_type;
+               std::remove_reference_t<T>::arity;
              }
   struct function_signature<T>
   {
@@ -43,12 +43,12 @@ namespace fho::detail
 
   /// @brief Specialization for callables (lambdas, functors with operator()).
   template<typename T>
-    requires requires { &std::remove_cvref_t<T>::operator(); } &&
+    requires requires { &std::remove_reference_t<T>::operator(); } &&
              (!requires {
-                 typename std::remove_cvref_t<T>::function_type;
-                 typename std::remove_cvref_t<T>::argument_types;
-                 typename std::remove_cvref_t<T>::result_type;
-                 std::remove_cvref_t<T>::arity;
+                 typename std::remove_reference_t<T>::function_type;
+                 typename std::remove_reference_t<T>::argument_types;
+                 typename std::remove_reference_t<T>::result_type;
+                 std::remove_reference_t<T>::arity;
                })
   struct function_signature<T>
   {
