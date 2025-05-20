@@ -59,19 +59,19 @@ main() -> int
   // Law 3: Interchange
   // u <*> pure y = pure ($ y) <*> u
   // where ($ y) f = f y
-  // {
-  //   auto y       = 10;
-  //   auto u       = pure(f);
-  //   auto result1 = ap(u, pure(y));
-  //   auto apply_y = [y](auto func) // NOLINT
-  //   {
-  //     return func(y);
-  //   };
-  //   auto result2 = ap(pure(apply_y), u);
-  //   // assert(result1.value() == result2.value());
-  //   // assert(result1.value() == f(y));
-  //   // static_assert(same_as<decltype(result1.value()), int>);
-  // }
+  {
+    auto y       = 10;
+    auto u       = pure(f);
+    auto result1 = ap(u, pure(y));
+    auto apply_y = [y](auto func) // NOLINT
+    {
+      return func(y);
+    };
+    auto result2 = ap(pure(apply_y), u);
+    assert(result1.value() == result2.value());
+    assert(result1.value() == f(y));
+    static_assert(same_as<decltype(result1.value()), int>);
+  }
 
   // Law 4: Composition
   // u <*> (v <*> w) = pure (.) <*> u <*> v <*> w
