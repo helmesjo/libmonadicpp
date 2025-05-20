@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <type_traits>
 
 namespace fho::detail
@@ -148,6 +149,24 @@ namespace fho::detail
     type(C&&) -> decltype(partial<Args...>::type(&std::remove_reference_t<C>::operator()))
     {
       return &std::remove_reference_t<C>::operator();
+    }
+
+    /// @brief Handles function "wrappers" explicitly by extracting their `operator()`.
+    /// @details Forwards the instance and extracts its `operator()` member function pointer,
+    /// ensuring the input is of type `std::function`.
+    /// @param f Function wrapper to process.
+    /// @return The `operator()` member function pointer.
+    /// @example
+    /// ```c++
+    /// auto f = std::function<int(int, int)>;
+    /// auto p = partial<int>::type(f); // Resolves to int(*)(int, int).
+    /// ```
+    template<template<typename> typename F, typename R, typename... Inferred>
+    static constexpr auto
+    type(F<R(Args..., Inferred...)> f)
+      -> decltype(partial<Args...>::type(&std::remove_reference_t<decltype(f)>::operator()))
+    {
+      return &std::remove_reference_t<decltype(f)>::operator();
     }
   };
 }
@@ -399,4 +418,10 @@ namespace fho::detail::tests::disambiguate
   /// @brief Ambiguity with not enough arguments explicit, can't infer rest (expects failure).
   static_assert(!can_deduce<callable>,
                 "Ambiguity with not enough arguments explicit, can't infer rest (expects failure)");
+
+  /// @test Function Wrapper (`std::function`)
+  /// @brief Trivial test to confirm that `std::function` (or similar) can be deduced.
+  static_assert(std::is_same_v<int (std::function<int(int, double)>::*)(int, double) const,
+                               decltype(partial<int>::type(std::function<int(int, double)>{}))>,
+                "No ambiguity with all arguments inferred");
 }
