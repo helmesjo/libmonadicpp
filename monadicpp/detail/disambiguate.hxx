@@ -39,7 +39,7 @@ namespace fho::detail
     template<typename R, typename... Inferred>
       requires (sizeof...(Inferred) > 0)
     static constexpr auto
-    type(R (*f)(Args..., Inferred...)) noexcept -> decltype(auto)
+    type(R (*f)(Args..., Inferred...)) noexcept -> R (*)(Args..., Inferred...)
     {
       return f;
     }
@@ -56,7 +56,7 @@ namespace fho::detail
     /// ```
     template<typename R>
     static constexpr auto
-    type(R (*f)(Args...)) noexcept -> decltype(auto)
+    type(R (*f)(Args...)) noexcept -> R (*)(Args...)
     {
       return f;
     }
@@ -74,7 +74,7 @@ namespace fho::detail
     template<typename C, typename R, typename... Inferred>
       requires (sizeof...(Inferred) > 0)
     static constexpr auto
-    type(R (C::*f)(Args..., Inferred...)) -> decltype(auto)
+    type(R (C::*f)(Args..., Inferred...)) -> R (C::*)(Args..., Inferred...)
     {
       return f;
     }
@@ -90,7 +90,7 @@ namespace fho::detail
     /// ```
     template<typename C, typename R>
     static constexpr auto
-    type(R (C::*f)(Args...)) -> decltype(auto)
+    type(R (C::*f)(Args...)) -> R (C::*)(Args...)
     {
       return f;
     }
@@ -108,7 +108,7 @@ namespace fho::detail
     template<typename C, typename R, typename... Inferred>
       requires (sizeof...(Inferred) > 0)
     static constexpr auto
-    type(R (C::*f)(Args..., Inferred...) const) -> decltype(auto)
+    type(R (C::*f)(Args..., Inferred...) const) -> R (C::*)(Args..., Inferred...) const
     {
       return f;
     }
@@ -125,7 +125,7 @@ namespace fho::detail
     /// ```
     template<typename C, typename R>
     static constexpr auto
-    type(R (C::*f)(Args...) const) -> decltype(auto)
+    type(R (C::*f)(Args...) const) -> R (C::*)(Args...) const
     {
       return f;
     }
@@ -232,16 +232,20 @@ namespace fho::detail::tests::disambiguate
     }
   };
 
+  constexpr auto immutable_lambda = [](int, double) -> int
+  {
+    return 1;
+  };
+
+  constexpr auto mutable_lambda = [](int, double) mutable -> int
+  {
+    return 1;
+  };
+
   template<typename T, typename... Args>
   constexpr auto can_deduce = requires { partial<Args...>::type(std::declval<T>()); };
 
   /// @test Free Functions
-  /// @brief No ambiguity with all arguments inferred.
-  static_assert(
-    std::is_same_v<int (*)(int, double), decltype(partial<int, double>::type(free_func))>,
-    "No ambiguity with all arguments inferred");
-
-  /// @test Free Functions
   /// @brief No ambiguity with all arguments explicit.
   static_assert(
     std::is_same_v<int (*)(int, double), decltype(partial<int, double>::type(free_func))>,
@@ -261,30 +265,12 @@ namespace fho::detail::tests::disambiguate
     "Ambiguity with all arguments inferred (expects failure)");
 
   /// @test Free Functions
-  /// @brief Ambiguity with all arguments explicit.
-  static_assert(
-    std::is_same_v<int (*)(int, double), decltype(partial<int, double>::type(free_func))>,
-    "Ambiguity with all arguments explicit");
-
-  /// @test Free Functions
-  /// @brief Ambiguity with first argument explicit, rest inferred.
-  static_assert(std::is_same_v<int (*)(int, double), decltype(partial<int>::type(free_func))>,
-                "Ambiguity with first argument explicit, rest inferred");
-
-  /// @test Free Functions
   /// @brief Ambiguity with not enough arguments explicit, can't infer rest (expects failure).
   static_assert(
     // partial<> with no arguments would fail to resolve
     true // Note: This would fail to compile if partial<> was used
     ,
     "Ambiguity with not enough arguments explicit, can't infer rest (expects failure)");
-
-  /// @test Non-const Member Functions
-  /// @brief No ambiguity with all arguments inferred.
-  static_assert(
-    std::is_same_v<int (test_struct::*)(int, double),
-                   decltype(partial<int, double>::type(&test_struct::non_const_member))>,
-    "No ambiguity with all arguments inferred");
 
   /// @test Non-const Member Functions
   /// @brief No ambiguity with all arguments explicit.
@@ -300,6 +286,12 @@ namespace fho::detail::tests::disambiguate
                 "No ambiguity with first argument explicit, rest inferred");
 
   /// @test Non-const Member Functions
+  /// @brief No ambiguity with first argument explicit, rest inferred.
+  static_assert(std::is_same_v<int (test_struct::*)(int, double),
+                               decltype(partial<int>::type(&test_struct::non_const_member))>,
+                "Ambiguity with first argument explicit, rest inferred");
+
+  /// @test Non-const Member Functions
   /// @brief Ambiguity with all arguments inferred (expects failure).
   static_assert(
     // No instantiation of partial<> to cause ambiguity
@@ -308,32 +300,12 @@ namespace fho::detail::tests::disambiguate
     "Ambiguity with all arguments inferred (expects failure)");
 
   /// @test Non-const Member Functions
-  /// @brief Ambiguity with all arguments explicit.
-  static_assert(
-    std::is_same_v<int (test_struct::*)(int, double),
-                   decltype(partial<int, double>::type(&test_struct::non_const_member))>,
-    "Ambiguity with all arguments explicit");
-
-  /// @test Non-const Member Functions
-  /// @brief Ambiguity with first argument explicit, rest inferred.
-  static_assert(std::is_same_v<int (test_struct::*)(int, double),
-                               decltype(partial<int>::type(&test_struct::non_const_member))>,
-                "Ambiguity with first argument explicit, rest inferred");
-
-  /// @test Non-const Member Functions
   /// @brief Ambiguity with not enough arguments explicit, can't infer rest (expects failure).
   static_assert(
     // partial<> with no arguments would fail to resolve
     true // Note: This would fail to compile if partial<> was used
     ,
     "Ambiguity with not enough arguments explicit, can't infer rest (expects failure)");
-
-  // Const member function tests
-  /// @test Const Member Functions
-  /// @brief No ambiguity with all arguments inferred.
-  static_assert(std::is_same_v<int (test_struct::*)(int, double) const,
-                               decltype(partial<int, double>::type(&test_struct::const_member))>,
-                "No ambiguity with all arguments inferred");
 
   /// @test Const Member Functions
   /// @brief No ambiguity with all arguments explicit.
@@ -356,31 +328,12 @@ namespace fho::detail::tests::disambiguate
     "Ambiguity with all arguments inferred (expects failure)");
 
   /// @test Const Member Functions
-  /// @brief Ambiguity with all arguments explicit.
-  static_assert(std::is_same_v<int (test_struct::*)(int, double) const,
-                               decltype(partial<int, double>::type(&test_struct::const_member))>,
-                "Ambiguity with all arguments explicit");
-
-  /// @test Const Member Functions
-  /// @brief Ambiguity with first argument explicit, rest inferred.
-  static_assert(std::is_same_v<int (test_struct::*)(int, double) const,
-                               decltype(partial<int>::type(&test_struct::const_member))>,
-                "Ambiguity with first argument explicit, rest inferred");
-
-  /// @test Const Member Functions
   /// @brief Ambiguity with not enough arguments explicit, can't infer rest (expects failure).
   static_assert(
     // partial<> with no arguments would fail to resolve
     true // Note: This would fail to compile if partial<> was used
     ,
     "Ambiguity with not enough arguments explicit, can't infer rest (expects failure)");
-
-  // Callable object tests
-  /// @test Callable Objects
-  /// @brief No ambiguity with all arguments inferred.
-  static_assert(std::is_same_v<int (callable::*)(int, double),
-                               decltype(partial<int, double>::type(callable{}))>,
-                "No ambiguity with all arguments inferred");
 
   /// @test Callable Objects
   /// @brief No ambiguity with all arguments explicit.
@@ -394,30 +347,29 @@ namespace fho::detail::tests::disambiguate
     std::is_same_v<int (callable::*)(int, double), decltype(partial<int>::type(callable{}))>,
     "No ambiguity with first argument explicit, rest inferred");
 
-  /// @test Callable Objects
-  /// @brief Ambiguity with all arguments inferred (expects failure).
-  static_assert(
-    // No instantiation of partial<> to cause ambiguity
-    true // Note: This would fail to compile if partial<> was used
-    ,
-    "Ambiguity with all arguments inferred (expects failure)");
-
-  /// @test Callable Objects
-  /// @brief Ambiguity with all arguments explicit.
-  static_assert(std::is_same_v<int (callable::*)(int, double),
-                               decltype(partial<int, double>::type(callable{}))>,
-                "Ambiguity with all arguments explicit");
-
-  /// @test Callable Objects
-  /// @brief Ambiguity with first argument explicit, rest inferred.
-  static_assert(
-    std::is_same_v<int (callable::*)(int, double), decltype(partial<int>::type(callable{}))>,
-    "Ambiguity with first argument explicit, rest inferred");
+  // Callable object tests
+  /// @test Callable Objects With Overloads
+  /// @brief Ambiguity with all arguments inferred (has overloads).
+  static_assert(!can_deduce<callable>, "Ambiguity with all arguments inferred (has overloads)");
 
   /// @test Callable Objects
   /// @brief Ambiguity with not enough arguments explicit, can't infer rest (expects failure).
   static_assert(!can_deduce<callable>,
                 "Ambiguity with not enough arguments explicit, can't infer rest (expects failure)");
+
+  // Lambda object tests
+  /// @test Immutable Lambda Objects
+  /// @brief No ambiguity with all arguments inferred.
+  static_assert(std::is_same_v<int (decltype(immutable_lambda)::*)(int, double) const,
+                               decltype(partial<>::type(immutable_lambda))>,
+                "Never ambiguity with all arguments inferred");
+
+  // Lambda object tests
+  /// @test Mutable Lambda Objects
+  /// @brief No ambiguity with all arguments inferred.
+  static_assert(std::is_same_v<int (decltype(mutable_lambda)::*)(int, double),
+                               decltype(partial<>::type(mutable_lambda))>,
+                "Never ambiguity with all arguments inferred");
 
   /// @test Function Wrapper (`std::function`)
   /// @brief Trivial test to confirm that `std::function` (or similar) can be deduced.
