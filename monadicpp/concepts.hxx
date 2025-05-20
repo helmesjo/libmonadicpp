@@ -16,55 +16,102 @@ namespace fho
 {
   namespace detail
   {
-    /// @brief A null monad for type T.
-    /// @details Acts as a placeholder monad that supports map, bind, and value operations,
-    /// returning default-constructed values.
+    /// @brief A null monad for type `T`.
+    /// @details Acts as a placeholder monad for type checking in concepts. It supports monadic
+    /// operations like map, bind, and value, but these are intended for concept checks and not
+    /// runtime use. The `value()` function is provided solely for type checking and should not be
+    /// called at runtime, as it would result in undefined behavior.
     template<typename T>
     struct null_monad
     {
       using value_type = T;
 
-      static constexpr auto pure(auto&&) -> null_monad;
-      constexpr auto        fmap(auto&&) const -> null_monad;
-      constexpr auto        bind(auto&&) const -> null_monad;
+      static constexpr auto pure(auto&&) noexcept -> null_monad;
+      constexpr auto        fmap(auto&&) const noexcept -> null_monad;
+      constexpr auto        bind(auto&&) const noexcept -> null_monad;
 
+      /// @brief Returns the value of the monad.
+      /// @details This function is only used for type checking in concepts and is never called at
+      /// runtime. Since `value_type` may not be default constructible (e.g., if it's a lambda), we
+      /// cannot return a default-constructed value. Instead, we use a static pointer `value_type*`
+      /// that is default-initialized to nullptr. Dereferencing it would cause undefined behavior,
+      /// but since this function is never called at runtime, it's acceptable.
       [[nodiscard]] constexpr auto
-      value() const -> value_type
+      value() const noexcept -> value_type
       {
-        return {};
+        /// Rationale: This static pointer to `value_type` is set to `nullptr`. By returning `*_`,
+        /// we provide a value of type `value_type` without actually constructing it, which is
+        /// necessary because `value_type` may not be default constructible (e.g., if `T` is a
+        /// lambda). Since this function is not called at runtime, the undefined behavior from
+        /// dereferencing `nullptr` does not occur.
+        static value_type* _ = nullptr;
+        return *_;
       }
     };
 
-    /// @brief A null functor for type T.
-    /// @details Provides a placeholder functor that supports map, returning a null monad.
+    /// @brief A null functor for type `T`.
+    /// @details Acts as a placeholder functor that supports the monadic `fmap` operation
+    /// returning a `null_monad<T>`, but this is intended for concept checks and not
+    /// runtime use as it will result in undefined behavior.
     template<typename T>
     struct null_functor
     {
       using value_type = T;
-      constexpr auto fmap(auto&&) const -> null_monad<std::remove_reference_t<T>>;
+
+      constexpr auto
+      fmap(auto&&) const noexcept -> null_monad<std::remove_reference_t<T>>
+      {
+        using return_type = null_monad<std::remove_reference_t<T>>;
+        /// Rationale: This static pointer to `return_type` is set to `nullptr`. By returning `*_`,
+        /// we provide a value of type `return_type` without actually constructing it, which is
+        /// necessary because `return_type` may not be default constructible (e.g., if `T` is a
+        /// lambda). Since this function is not called at runtime, the undefined behavior from
+        /// dereferencing `nullptr` does not occur.
+        static return_type* _ = nullptr;
+        return *_;
+      }
     };
 
     /// @brief A null monadic function.
-    /// @details Placeholder function that takes any input and returns a null monad.
+    /// @details Acts as a placeholder monadic function (something producing a monad) for type
+    /// checking in concepts. It supports the call operator (`operator()`), but this is not
+    /// intended for runtime use. The `operator()` function is provided solely for type
+    /// checking and should not be called at runtime, as it would result in undefined behavior.
     struct null_monadic_func
     {
       template<typename T>
       constexpr auto
-      operator()(T&&) const -> null_monad<std::remove_reference_t<T>>
+      operator()(T&&) const noexcept -> null_monad<std::remove_reference_t<T>>
       {
-        return {};
+        using return_type = null_monad<std::remove_reference_t<T>>;
+        /// Rationale: This static pointer to `return_type` is set to `nullptr`. By returning `*_`,
+        /// we provide a value of type return_type without actually constructing it, which is
+        /// necessary because `return_type` may not be default constructible (e.g., if `T` is a
+        /// lambda). Since this function is not called at runtime, the undefined behavior from
+        /// dereferencing `nullptr` does not occur.
+        static return_type* _ = nullptr;
+        return *_;
       }
     };
 
     /// @brief A pure null function.
-    /// @details Placeholder function that returns a default-constructed value of the input type.
+    /// @details Acts as a pure (immutable) placeholder callable for type checking in concepts. It
+    /// supports the call operator (`operator()`), but this is not intended for runtime use. The
+    /// `operator()` function is provided solely for type checking and should not be called at
+    /// runtime, as it would result in undefined behavior.
     template<typename R, typename... Args>
     struct null_pure_func
     {
       constexpr auto
-      operator()(Args...) const -> R
+      operator()(Args...) const noexcept -> R
       {
-        return {};
+        /// Rationale: This static pointer to `R` is set to `nullptr`. By returning `*_`,
+        /// we provide a value of type R without actually constructing it, which is
+        /// necessary because `R` may not be default constructible (e.g., if `R` is a
+        /// lambda). Since this function is not called at runtime, the undefined behavior from
+        /// dereferencing `nullptr` does not occur.
+        static R* _ = nullptr;
+        return *_;
       }
     };
 
