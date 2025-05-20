@@ -3,6 +3,7 @@
 #include <monadicpp/applicative.hxx>
 #include <monadicpp/concepts.hxx>
 #include <monadicpp/traits.hxx>
+#include <monadicpp/detail/disambiguate.hxx>
 #include <monadicpp/detail/func_traits.hxx>
 
 #include <utility>
@@ -63,7 +64,8 @@ namespace fho
   /// The `Morphism` template parameter defines how computations are composed.
   /// `Sig` is an optional type for debugging, representing the (composed) computation's signature.
   template<typename Morphism, typename T, invocable_r<T> Comp,
-           typename Sig = detail::signature_t<Comp>>
+           typename Sig =
+             detail::signature_t<decltype(detail::partial<>::type(std::declval<Comp>()))>>
   class monad
   {
   public:
@@ -157,7 +159,7 @@ namespace fho
   pure(Func f) noexcept
   {
     using value_t = std::invoke_result_t<Func>;
-    return monad<Morphism, value_t, Func, detail::signature_t<Func>>(std::move(f));
+    return monad<Morphism, value_t, Func>(std::move(f));
   }
 
   /// @brief Creates a monad from a plain value.
@@ -172,7 +174,7 @@ namespace fho
     {
       return v;
     };
-    return monad<Morphism, T, decltype(f), detail::signature_t<decltype(f)>>{std::move(f)};
+    return monad<Morphism, T, decltype(f)>{std::move(f)};
   }
 
   /// @brief Maps a pure function over a functor (`<$>` in Haskell).

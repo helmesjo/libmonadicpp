@@ -22,7 +22,9 @@ namespace fho::detail
   {};
 
   template<typename T, typename... Computations>
-  using signature_t = typename detail::flatten_pack_t<monad_signature, T, Computations...>;
+  using signature_t =
+    typename detail::flatten_pack_t<monad_signature, T,
+                                    decltype(partial<>::type(std::declval<Computations>()))...>;
 }
 
 /// @brief Specializations of `tuple_element_t` & `tuple_size_v` for `monad_signature`.
