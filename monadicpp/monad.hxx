@@ -118,7 +118,7 @@ namespace fho
         return b(std::forward_like<compute_type>(c)()).value();
       };
       using U = std::invoke_result_t<F, value_type>;
-      using V = typename U::value_type;
+      using V = typename std::remove_reference_t<U>::value_type;
       using M = monad<Morphism, V, decltype(l), detail::signature_t<Sig, decltype(l)>>;
       return M(std::move(l));
     }

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <monadicpp/traits.hxx>
-#include <monadicpp/detail/cmacros.hxx>
 #include <monadicpp/detail/disambiguate.hxx>
 
 #include <concepts>
@@ -10,7 +9,13 @@
 
 #define FWD(...) ::std::forward<decltype(__VA_ARGS__)>(__VA_ARGS__)
 
-FHO_PUSH_OFF(FHO_W_UNUSED, FHO_W_UNDEF_INLINE)
+/// Rationale: This static pointer to `T` is set to `nullptr`. By returning a reference (`*_`), we
+/// provide a value of type `T` without actually constructing it, which is necessary because `T` may
+/// not be default constructible (e.g., if `T` is a lambda). Since this function is not called at
+/// runtime, the undefined behavior from dereferencing `nullptr` does not occur.
+#define FHO_NULLOP(T)    \
+  static T* _ = nullptr; \
+  return *_
 
 namespace fho
 {
@@ -18,100 +23,87 @@ namespace fho
   {
     /// @brief A null monad for type `T`.
     /// @details Acts as a placeholder monad for type checking in concepts. It supports monadic
-    /// operations like map, bind, and value, but these are intended for concept checks and not
-    /// runtime use. The `value()` function is provided solely for type checking and should not be
-    /// called at runtime, as it would result in undefined behavior.
+    /// operations like map, bind, and value, intended for compile-time concept checks and not
+    /// runtime use. Use in runtime context results in undefined behavior.
     template<typename T>
     struct null_monad
     {
       using value_type = T;
 
-      static constexpr auto pure(auto&&) noexcept -> null_monad;
-      constexpr auto        fmap(auto&&) const noexcept -> null_monad;
-      constexpr auto        bind(auto&&) const noexcept -> null_monad;
-
-      /// @brief Returns the value of the monad.
-      /// @details This function is only used for type checking in concepts and is never called at
-      /// runtime. Since `value_type` may not be default constructible (e.g., if it's a lambda), we
-      /// cannot return a default-constructed value. Instead, we use a static pointer `value_type*`
-      /// that is default-initialized to nullptr. Dereferencing it would cause undefined behavior,
-      /// but since this function is never called at runtime, it's acceptable.
-      [[nodiscard]] constexpr auto
-      value() const noexcept -> value_type
+      static constexpr auto
+      pure(auto&&) noexcept -> null_monad&
       {
-        /// Rationale: This static pointer to `value_type` is set to `nullptr`. By returning `*_`,
-        /// we provide a value of type `value_type` without actually constructing it, which is
-        /// necessary because `value_type` may not be default constructible (e.g., if `T` is a
-        /// lambda). Since this function is not called at runtime, the undefined behavior from
-        /// dereferencing `nullptr` does not occur.
-        static value_type* _ = nullptr;
-        return *_;
+        FHO_NULLOP(null_monad);
+      }
+
+      constexpr auto
+      fmap(auto&&) const noexcept -> null_monad&
+      {
+        FHO_NULLOP(null_monad);
+      }
+
+      constexpr auto
+      bind(auto&&) const noexcept -> null_monad&
+      {
+        FHO_NULLOP(null_monad);
+      }
+
+      constexpr auto
+      ap(auto&&) const noexcept -> null_monad&
+      {
+        FHO_NULLOP(null_monad);
+      }
+
+      [[nodiscard]] constexpr auto
+      value() const noexcept -> value_type&
+      {
+        FHO_NULLOP(value_type);
       }
     };
 
     /// @brief A null functor for type `T`.
     /// @details Acts as a placeholder functor that supports the monadic `fmap` operation
-    /// returning a `null_monad<T>`, but this is intended for concept checks and not
-    /// runtime use as it will result in undefined behavior.
+    /// returning a `null_monad<T>`, intended for compile-time concept checks and not runtime use.
+    /// Use in runtime context results in undefined behavior.
     template<typename T>
     struct null_functor
     {
-      using value_type = T;
+      using value_type  = T;
+      using return_type = null_monad<std::remove_reference_t<T>>;
 
       constexpr auto
-      fmap(auto&&) const noexcept -> null_monad<std::remove_reference_t<T>>
+      fmap(auto&&) const noexcept -> return_type&
       {
-        using return_type = null_monad<std::remove_reference_t<T>>;
-        /// Rationale: This static pointer to `return_type` is set to `nullptr`. By returning `*_`,
-        /// we provide a value of type `return_type` without actually constructing it, which is
-        /// necessary because `return_type` may not be default constructible (e.g., if `T` is a
-        /// lambda). Since this function is not called at runtime, the undefined behavior from
-        /// dereferencing `nullptr` does not occur.
-        static return_type* _ = nullptr;
-        return *_;
+        FHO_NULLOP(return_type);
       }
     };
 
     /// @brief A null monadic function.
     /// @details Acts as a placeholder monadic function (something producing a monad) for type
-    /// checking in concepts. It supports the call operator (`operator()`), but this is not
-    /// intended for runtime use. The `operator()` function is provided solely for type
-    /// checking and should not be called at runtime, as it would result in undefined behavior.
+    /// checking in concepts. It supports the call operator (`operator()`), intended for
+    /// compile-time concept checks and not runtime use. Use in runtime context results in undefined
+    /// behavior.
     struct null_monadic_func
     {
-      template<typename T>
+      template<typename T, typename R = null_monad<std::remove_reference_t<T>>>
       constexpr auto
-      operator()(T&&) const noexcept -> null_monad<std::remove_reference_t<T>>
+      operator()(T&&) const noexcept -> R&
       {
-        using return_type = null_monad<std::remove_reference_t<T>>;
-        /// Rationale: This static pointer to `return_type` is set to `nullptr`. By returning `*_`,
-        /// we provide a value of type return_type without actually constructing it, which is
-        /// necessary because `return_type` may not be default constructible (e.g., if `T` is a
-        /// lambda). Since this function is not called at runtime, the undefined behavior from
-        /// dereferencing `nullptr` does not occur.
-        static return_type* _ = nullptr;
-        return *_;
+        FHO_NULLOP(R);
       }
     };
 
     /// @brief A pure null function.
     /// @details Acts as a pure (immutable) placeholder callable for type checking in concepts. It
-    /// supports the call operator (`operator()`), but this is not intended for runtime use. The
-    /// `operator()` function is provided solely for type checking and should not be called at
-    /// runtime, as it would result in undefined behavior.
+    /// supports the call operator (`operator()`), intended for compile-time concept checks and not
+    /// runtime use. Use in runtime context results in undefined behavior.
     template<typename R, typename... Args>
     struct null_pure_func
     {
       constexpr auto
-      operator()(Args...) const noexcept -> R
+      operator()(Args...) const noexcept -> R&
       {
-        /// Rationale: This static pointer to `R` is set to `nullptr`. By returning `*_`,
-        /// we provide a value of type R without actually constructing it, which is
-        /// necessary because `R` may not be default constructible (e.g., if `R` is a
-        /// lambda). Since this function is not called at runtime, the undefined behavior from
-        /// dereferencing `nullptr` does not occur.
-        static R* _ = nullptr;
-        return *_;
+        FHO_NULLOP(R);
       }
     };
 
@@ -186,6 +178,7 @@ namespace fho
                       typename std::remove_reference_t<T>::value_type;
                       t.fmap(std::declval<detail::null_pure_func<int, decltype(v)>>());
                       t.bind(std::declval<detail::null_monadic_func>());
+                      t.ap(std::declval<detail::null_monad<T>>());
                       { t.value() } -> std::common_with<decltype(v)>;
                     };
 
@@ -246,6 +239,5 @@ namespace fho
   static_assert(mappable<detail::null_pure_func<int, int>, detail::null_monad<int>>);
 }
 
-FHO_POP_OFF
-
+#undef FHO_NULLOP
 #undef FWD
