@@ -198,7 +198,7 @@ namespace fho
     };
 
   /// @brief Concept for pure functions.
-  /// @details Ensures a function is invocable with `Args...` and does not return a monadic type.
+  /// @details Ensures a function is (an immutable) invocable with `Args...`.
   template<typename T, typename... Args>
   concept pure_func = requires (T const t) {
                         { t(std::declval<Args>()...) };
