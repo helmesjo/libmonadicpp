@@ -3,6 +3,7 @@
 #include <monadicpp/detail/func_traits.hxx>
 #include <monadicpp/detail/traits/applied_tuple.hxx>
 #include <monadicpp/detail/traits/flatten.hxx>
+#include <monadicpp/detail/traits/invocation.hxx>
 #include <monadicpp/detail/traits/subtuple.hxx>
 #include <monadicpp/detail/traits/tuple_cat.hxx>
 

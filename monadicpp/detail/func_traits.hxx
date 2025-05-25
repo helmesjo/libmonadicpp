@@ -85,11 +85,6 @@ namespace fho::detail
   using argument_type_t = typename function_signature<decltype(partial<>::type(
     std::declval<T>()))>::template argument_type_t<I>;
 
-  /// @breif Number of arguments for callable `T`.
-  template<typename T>
-  static constexpr auto arity = function_signature<
-    std::remove_reference_t<decltype(partial<>::type(std::declval<T>()))>>::arity;
-
   /// @brief TEST: Function Signature
   static_assert(
     []
@@ -175,17 +170,4 @@ namespace fho::detail
              std::same_as<float const&, argument_type_t<func_t, 1>> &&
              std::same_as<double, argument_type_t<func_t, 2>>;
     }());
-
-  /// @brief TEST: Argument count
-  static_assert(1 == arity<int (*)(int)>);
-  static_assert(2 == arity<int (*)(int, float)>);
-  static_assert(3 == arity<int (*)(int, float, double)>);
-
-  static_assert(1 == arity<decltype([](int) -> int{ return 1; })>);
-  static_assert(2 == arity<decltype([](int, float) -> int{ return 1; })>);
-  static_assert(3 == arity<decltype([](int, float, double) -> int{ return 1; })>);
-
-  static_assert(1 == arity<std::function<int(int)>>);
-  static_assert(2 == arity<std::function<int(int, float)>>);
-  static_assert(3 == arity<std::function<int(int, float, double)>>);
 }
