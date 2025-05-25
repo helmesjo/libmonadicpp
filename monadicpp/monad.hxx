@@ -87,9 +87,9 @@ namespace fho
     constexpr auto operator=(monad&&) -> monad&      = default;
 
     /// @brief Maps a function over the monad’s value (`<$>` in Haskell).
-    /// @tparam F Pure function (`mappable<F, monad>`) type taking `value_type` and returning a new
-    /// value.
-    /// @param f The function to apply to the monad's value.
+    /// @tparam `F` Pure function (`mappable<F, monad>`) type taking `value_type` and returning a
+    /// new value.
+    /// @param `f` The function to apply to the monad's value.
     /// @return A new monad containing the computation composed with f.
     template<mappable<monad> F>
     [[nodiscard]] constexpr auto
@@ -105,9 +105,9 @@ namespace fho
     }
 
     /// @brief Chains a function to the monad’s value (`>>=` in Haskell).
-    /// @tparam F Function (`bindable<F, monad>`) type taking `value_type` and returning a new monad
-    /// or a callable.
-    /// @param f The function to chain, producing a new monad or callable from the value.
+    /// @tparam `F` Function (`bindable<F, monad>`) type taking `value_type` and returning a new
+    /// monad or a callable.
+    /// @param `f` The function to chain, producing a new monad or callable from the value.
     /// @return A new monad with the chained computation.
     template<bindable<monad> F>
     [[nodiscard]] constexpr auto
@@ -124,8 +124,8 @@ namespace fho
     }
 
     /// @brief Applies a function wrapped in a monad to this monad's value (`<*>` in Haskell).
-    /// @tparam MF The monad type (`monadic`) containing the function to apply.
-    /// @param mf The monad containing a function to apply to this monad's value.
+    /// @tparam `MF` The monad type (`monadic`) containing the function to apply.
+    /// @param `mf` The monad containing a function to apply to this monad's value.
     /// @return A new monad with the result of applying the function.
     template<monadic MF>
     [[nodiscard]] constexpr auto
@@ -152,7 +152,7 @@ namespace fho
   };
 
   /// @brief Creates a monad from a function.
-  /// @param f Function producing the monad’s value.
+  /// @param `f` Function producing the monad’s value.
   /// @return A monad wrapping the function.
   template<typename Morphism = compose, std::invocable Func>
   static constexpr auto
@@ -163,7 +163,7 @@ namespace fho
   }
 
   /// @brief Creates a monad from a plain value.
-  /// @param v Value to wrap in the monad.
+  /// @param `v` Value to wrap in the monad.
   /// @return A monad wrapping a function that returns the value.
   template<typename Morphism = compose, typename T>
     requires (!std::invocable<T>)

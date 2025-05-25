@@ -174,10 +174,10 @@ namespace fho
 
   /// @brief Creates a curried version of a function, enabling partial application.
   ///
-  /// @tparam F The type of the function to curry.
-  /// @tparam Args Variadic template for arguments to partially apply.
-  /// @param f The function to curry, forwarded as an rvalue reference.
-  /// @param args Arguments to bind, forwarded as rvalue references.
+  /// @tparam `F` The type of the function to curry.
+  /// @tparam `Args` Variadic template for arguments to partially apply.
+  /// @param `f` The function to curry, forwarded as an rvalue reference.
+  /// @param `args` Arguments to bind, forwarded as rvalue references.
   /// @return Either a zero-parameter callable wrapping the result of invoking `f` with `args` if
   /// invocable, otherwise a _partially applied_ non-zero parameter callable for further
   /// application.
