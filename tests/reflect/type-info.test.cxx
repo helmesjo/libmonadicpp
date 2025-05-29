@@ -12,7 +12,8 @@ main() -> int
 
   std::cout << '\n';
   std::cout << '\n';
-  std::cout << std::format("        free func: {}\n", type_str(&foo));
+  std::cout << std::format("    free func ref: {}\n", type_str(foo));
+  std::cout << std::format("    free func ptr: {}\n", type_str(&foo));
   std::cout << std::format("      member func: {}\n", type_str(&hello::foo));
   std::cout << std::format("const member func: {}\n", type_str(&hello::bar));
   std::cout << std::format("  member operator: {}\n", type_str(&hello::operator()));
