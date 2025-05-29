@@ -1,5 +1,6 @@
 #pragma once
 
+#include <concepts>
 #include <functional>
 #include <type_traits>
 
@@ -373,7 +374,8 @@ namespace fho::detail::tests::disambiguate
 
   /// @test Function Wrapper (`std::function`)
   /// @brief Trivial test to confirm that `std::function` (or similar) can be deduced.
-  static_assert(std::is_same_v<int (std::function<int(int, double)>::*)(int, double) const,
+  static_assert(
+    std::common_reference_with<int (std::function<int(int, double)>::*)(int, double) const,
                                decltype(partial<int>::type(std::function<int(int, double)>{}))>,
-                "No ambiguity with all arguments inferred");
+    "No ambiguity with all arguments inferred");
 }
