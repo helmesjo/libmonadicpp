@@ -1,5 +1,6 @@
 #pragma once
 
+#include <concepts>
 #include <tuple>
 #include <type_traits>
 
@@ -9,22 +10,19 @@ namespace fho::detail
   template<template<typename...> typename Trait, typename... Rest>
   struct applied_tuple
   {
-    using type                  = typename Trait<Rest...>::type; // NOLINT
-    static constexpr bool value = type::value;
+    using type = typename Trait<Rest...>::type; // NOLINT
   };
 
   template<template<typename...> typename Trait, typename Arg1, typename... Ts, typename... Rest>
   struct applied_tuple<Trait, Arg1, std::tuple<Ts...>, Rest...>
   {
-    using type                  = typename Trait<Arg1, Ts..., Rest...>::type; // NOLINT
-    static constexpr bool value = type::value;
+    using type = typename Trait<Arg1, Ts..., Rest...>::type; // NOLINT
   };
 
   template<template<typename...> typename Trait, typename... Ts>
   struct applied_tuple<Trait, std::tuple<Ts...>>
   {
-    using type                  = typename Trait<Ts...>::type; // NOLINT
-    static constexpr bool value = type::value;
+    using type = typename Trait<Ts...>::type; // NOLINT
   };
 
   /// @brief Applies `Tuple` & `Rest...` to `Trait`.
