@@ -1,8 +1,6 @@
 #include <cstddef>
 #include <utility>
 
-#define FWD(...) ::std::forward<decltype(__VA_ARGS__)>(__VA_ARGS__)
-
 namespace fho::detail
 {
   template<std::size_t I>
@@ -22,7 +20,7 @@ namespace fho::detail
   constexpr auto
   probe_arg_count() noexcept -> decltype(auto)
   {
-    return []<typename Self, std::size_t... Is>(this Self&& self, std::index_sequence<Is...> is)
+    return []<std::size_t... Is>(this auto&& self, std::index_sequence<Is...> is)
     {
       static constexpr auto i = sizeof...(Is);
       if constexpr (i > N)
@@ -36,7 +34,7 @@ namespace fho::detail
       }
       else
       {
-        return FWD(self).template operator()(std::make_index_sequence<i + 1>{});
+        return self(std::make_index_sequence<i + 1>{});
       }
     }(std::make_index_sequence<0>{});
   }
@@ -83,5 +81,3 @@ namespace fho::detail::test::invocation
   static_assert(2 == arity<decltype([](int, float) -> int{ return 1; })>);
   static_assert(3 == arity<decltype([](int, float, double) -> int{ return 1; })>);
 }
-
-#undef FWD
