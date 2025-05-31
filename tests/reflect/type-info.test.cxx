@@ -16,6 +16,7 @@ main() -> int
   std::cout << std::format("int const&   : {}\n", type_str<int const&>());
   std::cout << std::format("string       : {}\n", type_str<std::string>());
   std::cout << std::format("string const&: {}\n", type_str<std::string const&>());
+  std::cout << std::format("user-defined : {}\n", type_str<hello>());
 
   std::cout << '\n';
   std::cout << std::format("int(float)      (raw): {}\n", type_str_raw<int(float)>());

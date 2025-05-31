@@ -14,6 +14,13 @@
 // NOLINTBEGIN
 namespace fho::detail
 {
+  /// @brief  `constexpr` replacement for `std::isalnum`
+  constexpr bool
+  is_alnum(char c) noexcept
+  {
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
+  }
+
   /// @brief Cleans a raw type string by removing compiler-specific artifacts, standard library
   /// namespaces, and applying standard formatting.
   /// @tparam `N` The size of the output array, defaults to 256.
@@ -23,7 +30,7 @@ namespace fho::detail
   /// @details
   /// Processes the input string by:
   /// - Removing MSVC-specific calling conventions (e.g., `__cdecl`, `__thiscall`).
-  /// - Removing standard library namespaces (e.g., `std`, `__cxx11`, `__gnu_cxx`).
+  /// - Removing namespaces (e.g., `std`, `__cxx11`, `__gnu_cxx`), keep type names.
   /// - Removing type keywords (e.g., `class` & `struct`).
   /// - Skipping spaces except after type qualifiers (e.g., `const`, `volatile`).
   /// - Adding explicit spaces:
@@ -53,13 +60,18 @@ namespace fho::detail
                                                 "__vectorcall"};
     constexpr std::string_view qualifiers[]  = {"const", "volatile"};
     constexpr std::string_view keywords[]    = {"class", "struct"};
-    constexpr std::string_view namespaces[]  = {"std", "__cxx11", "__gnu_cxx"};
 
     auto   result  = std::array<char, N>{};
     size_t out_pos = 0;
     int    depth   = 0;
     size_t i       = 0;
-    while (i < input.size() && out_pos < N - 1)
+
+    auto in_bounds = [&]()
+    {
+      return i < input.size() && out_pos < N;
+    };
+
+    while (in_bounds())
     {
       // Step 1: Skip calling conventions
       bool skipped = false;
@@ -77,33 +89,64 @@ namespace fho::detail
         continue;
       }
 
-      // Step 2: Skip standard library namespaces
-      bool is_namespace = false;
-      for (auto ns : namespaces)
+      // Step 2: Skip namespace prefixes, keep last identifier if followed by ::*
+      if (!in_bounds())
       {
-        if (input.substr(i).starts_with(ns))
+        break;
+      }
+      size_t start_i       = i;
+      size_t id_start      = i;
+      size_t id_end        = i;
+      bool   has_namespace = false;
+      while (i < input.size() && out_pos < N)
+      {
+        id_start = i;
+        // Skip identifier
+        while (i < input.size() && is_alnum(input[i]))
         {
-          // Ensure namespace is followed by :: or end of string
-          size_t next_pos = i + ns.size();
-          if (next_pos >= input.size() ||
-              (next_pos + 1 < input.size() && input[next_pos] == ':' && input[next_pos + 1] == ':'))
+          i++;
+        }
+        id_end = i;
+        // Check if followed by :: or ::*
+        if (i + 1 < input.size() && input[i] == ':' && input[i + 1] == ':')
+        {
+          if (i + 2 < input.size() && !is_alnum(input[i + 2]))
           {
-            i = next_pos;
-            if (i < input.size() && input[i] == ':')
-            {
-              i += 2; // Skip ::
-            }
-            is_namespace = true;
+            // It's ::*, so keep this identifier
             break;
           }
+          else
+          {
+            // It's ::, continue skipping
+            i += 2;
+            has_namespace = true;
+          }
+        }
+        else
+        {
+          break;
         }
       }
-      if (is_namespace)
+
+      if (has_namespace)
       {
-        continue;
+        // Write only the last identifier
+        for (size_t j = id_start; j < id_end && out_pos < N - 1; j++)
+        {
+          result[out_pos++] = input[j];
+        }
+        // Continue processing from i
+      }
+      else
+      {
+        i = start_i; // No namespace, restore i
       }
 
       // Step 3: Skip class/struct keywords followed by space
+      if (!in_bounds())
+      {
+        break;
+      }
       for (auto kw : keywords)
       {
         if (input.substr(i).starts_with(kw) && i + kw.size() < input.size() &&
@@ -120,6 +163,10 @@ namespace fho::detail
       }
 
       // Step 4: Handle qualifiers followed by space
+      if (!in_bounds())
+      {
+        break;
+      }
       bool is_qualifier = false;
       for (auto qual : qualifiers)
       {
@@ -145,6 +192,10 @@ namespace fho::detail
       }
 
       // Step 5: Skip other spaces
+      if (!in_bounds())
+      {
+        break;
+      }
       if (input[i] == ' ')
       {
         i++;
@@ -155,6 +206,10 @@ namespace fho::detail
       if (c == '(')
       {
         // Step 6: Add space before opening parenthesis if top-level
+        if (!in_bounds())
+        {
+          break;
+        }
         if (depth == 0 && out_pos > 0 && result[out_pos - 1] != ' ')
         {
           result[out_pos++] = ' ';
@@ -165,6 +220,10 @@ namespace fho::detail
       else if (c == ')')
       {
         // Step 7: Add closing parenthesis and space if top-level
+        if (!in_bounds())
+        {
+          break;
+        }
         result[out_pos++] = ')';
         depth--;
         if (depth == 0 && out_pos < N - 1)
@@ -175,6 +234,10 @@ namespace fho::detail
       else if (c == ',' && depth == 1)
       {
         // Step 8: Handle commas in parameter lists with space
+        if (!in_bounds())
+        {
+          break;
+        }
         result[out_pos++] = ',';
         if (out_pos < N - 1)
         {
@@ -184,13 +247,17 @@ namespace fho::detail
       else
       {
         // Step 9: Write other characters
+        if (!in_bounds())
+        {
+          break;
+        }
         result[out_pos++] = c;
       }
       i++;
     }
 
-    // Step 10: Trim trailing space and null-terminate
-    if (out_pos > 0 && result[out_pos - 1] == ' ')
+    // Step 10: Trim trailing space and/or truncate, then null-terminate
+    while ((out_pos > 0 && result[out_pos - 1] == ' ') || out_pos >= N)
     {
       out_pos--;
     }
@@ -384,12 +451,13 @@ namespace fho::detail::test::reflect
   static_assert(type_str(&foo) == "void (*) (int, float)", "Free Function pointer signature");
 
   /// @brief TEST: Member Functions
-  static_assert(type_str(&hello::foo).ends_with("hello::*) (float, double)"),
+  static_assert(type_str(&hello::foo) == "int (hello::*) (float, double)",
                 "Non-Const Member signature");
-  static_assert(type_str(&hello::bar).ends_with("hello::*) (float, double) const"),
+  static_assert(type_str(&hello::bar) == "int (hello::*) (float, double) const",
                 "Const Member Function signature");
 
   /// @brief TEST: Primitives
+  static_assert(type_str<hello>() == "hello", "User type");
   static_assert(type_str<int>() == "int", "Fundamental type");
   static_assert(type_str<int const>() == "const int", "CV-qualified type");
   static_assert(type_str<int>() != type_str<float>(), "Distinct types");
