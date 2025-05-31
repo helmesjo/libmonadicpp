@@ -14,27 +14,35 @@
 // NOLINTBEGIN
 namespace fho::detail
 {
-  /// @brief Cleans a raw type string by removing compiler-specific artifacts and applying standard
-  /// formatting.
+  /// @brief Cleans a raw type string by removing compiler-specific artifacts, standard library
+  /// namespaces, and applying standard formatting.
   /// @tparam `N` The size of the output array, defaults to 256.
-  /// @param input The raw type string to clean, typically from `__FUNCSIG__` (MSVC) or
-  /// `__PRETTY_FUNCTION__` (Clang/GCC).
+  /// @param input The raw type string to clean, typically from `__PRETTY__` (Clang/GCC) or
+  /// `__FUNCSIG__` (MSVC).
   /// @return A `std::array<char, N>` containing the cleaned type string, null-terminated.
   /// @details
-  /// Processes the input by:
+  /// Processes the input string by:
   /// - Removing MSVC-specific calling conventions (e.g., `__cdecl`, `__thiscall`).
-  /// - Skipping all input spaces and adding spaces explicitly:
+  /// - Removing standard library namespaces (e.g., `std`, `__cxx11`, `__gnu_cxx`).
+  /// - Removing type keywords (e.g., `class` & `struct`).
+  /// - Skipping spaces except after type qualifiers (e.g., `const`, `volatile`).
+  /// - Adding explicit spaces:
   ///   - Before top-level opening parenthesis '(' if not preceded by a space.
   ///   - After top-level closing parenthesis ')'.
   ///   - After commas ',' in parameter lists.
   /// - Preserving member function pointer syntax '(class_name::*)' without extra spaces.
+  /// - Preserving spaces in qualified types (e.g., `const int&`) and after `class` or `struct`
+  /// (e.g., `class std::basic_string<...>`).
   /// - Null-terminating the output array.
   /// The function is idempotent, ensuring repeated applications produce identical output.
   /// @example
   /// ```c++
-  /// constexpr auto raw = "void(__cdecl&)(int,float)";
-  /// constexpr auto cleaned = clean_string_array<256>(raw);
+  /// constexpr auto cleaned = clean_string_array("void(__cdecl&)(int,float)");
   /// static_assert(array_to_string_view(cleaned) == "void (&)(int, float)");
+  /// constexpr auto qual_cleaned = clean_string_array("int const&");
+  /// static_assert(array_to_string_view(qual_cleaned) == "int const&");
+  /// constexpr auto cls_cleaned = clean_string_array("class std::string");
+  /// static_assert(array_to_string_view(cls_cleaned) == "string");
   /// ```
   /// NOTE: N=256 is sufficient for most type strings; increase as needed for complex types.
   template<size_t N = 256>
@@ -43,14 +51,17 @@ namespace fho::detail
   {
     constexpr std::string_view conventions[] = {"__cdecl", "__thiscall", "__stdcall", "__fastcall",
                                                 "__vectorcall"};
+    constexpr std::string_view qualifiers[]  = {"const", "volatile"};
+    constexpr std::string_view keywords[]    = {"class", "struct"};
+    constexpr std::string_view namespaces[]  = {"std", "__cxx11", "__gnu_cxx"};
 
-    auto        result  = std::array<char, N>{};
-    std::size_t out_pos = 0;
-    int         depth   = 0;
-    std::size_t i       = 0;
-
-    while (i < input.size() && out_pos < N)
+    auto   result  = std::array<char, N>{};
+    size_t out_pos = 0;
+    int    depth   = 0;
+    size_t i       = 0;
+    while (i < input.size() && out_pos < N - 1)
     {
+      // Step 1: Skip calling conventions
       bool skipped = false;
       for (auto cc : conventions)
       {
@@ -65,6 +76,75 @@ namespace fho::detail
       {
         continue;
       }
+
+      // Step 2: Skip standard library namespaces
+      bool is_namespace = false;
+      for (auto ns : namespaces)
+      {
+        if (input.substr(i).starts_with(ns))
+        {
+          // Ensure namespace is followed by :: or end of string
+          size_t next_pos = i + ns.size();
+          if (next_pos >= input.size() ||
+              (next_pos + 1 < input.size() && input[next_pos] == ':' && input[next_pos + 1] == ':'))
+          {
+            i = next_pos;
+            if (i < input.size() && input[i] == ':')
+            {
+              i += 2; // Skip ::
+            }
+            is_namespace = true;
+            break;
+          }
+        }
+      }
+      if (is_namespace)
+      {
+        continue;
+      }
+
+      // Step 3: Skip class/struct keywords followed by space
+      for (auto kw : keywords)
+      {
+        if (input.substr(i).starts_with(kw) && i + kw.size() < input.size() &&
+            input[i + kw.size()] == ' ')
+        {
+          i += kw.size() + 1;
+          skipped = true;
+          break;
+        }
+      }
+      if (skipped)
+      {
+        continue;
+      }
+
+      // Step 4: Handle qualifiers followed by space
+      bool is_qualifier = false;
+      for (auto qual : qualifiers)
+      {
+        if (input.substr(i).starts_with(qual) && i + qual.size() < input.size() &&
+            input[i + qual.size()] == ' ')
+        {
+          for (size_t j = 0; j < qual.size() && out_pos < N - 1; ++j)
+          {
+            result[out_pos++] = input[i + j];
+          }
+          if (out_pos < N - 1)
+          {
+            result[out_pos++] = ' ';
+          }
+          i += qual.size() + 1;
+          is_qualifier = true;
+          break;
+        }
+      }
+      if (is_qualifier)
+      {
+        continue;
+      }
+
+      // Step 5: Skip other spaces
       if (input[i] == ' ')
       {
         i++;
@@ -74,57 +154,47 @@ namespace fho::detail
       char c = input[i];
       if (c == '(')
       {
-        if (depth == 0 && out_pos > 0 && result[out_pos - 1] != ' ' && out_pos < N)
+        // Step 6: Add space before opening parenthesis if top-level
+        if (depth == 0 && out_pos > 0 && result[out_pos - 1] != ' ')
         {
           result[out_pos++] = ' ';
         }
-        if (out_pos < N)
-        {
-          result[out_pos++] = '(';
-        }
+        result[out_pos++] = '(';
         depth++;
       }
       else if (c == ')')
       {
-        if (out_pos < N)
-        {
-          result[out_pos++] = ')';
-        }
+        // Step 7: Add closing parenthesis and space if top-level
+        result[out_pos++] = ')';
         depth--;
-        if (depth == 0 && out_pos < N)
+        if (depth == 0 && out_pos < N - 1)
         {
           result[out_pos++] = ' ';
         }
       }
       else if (c == ',' && depth == 1)
       {
-        if (out_pos < N)
-        {
-          result[out_pos++] = ',';
-        }
-        if (out_pos < N)
+        // Step 8: Handle commas in parameter lists with space
+        result[out_pos++] = ',';
+        if (out_pos < N - 1)
         {
           result[out_pos++] = ' ';
         }
       }
       else
       {
-        if (out_pos < N)
-        {
-          result[out_pos++] = c;
-        }
+        // Step 9: Write other characters
+        result[out_pos++] = c;
       }
       i++;
     }
 
+    // Step 10: Trim trailing space and null-terminate
     if (out_pos > 0 && result[out_pos - 1] == ' ')
     {
       out_pos--;
     }
-    if (out_pos < N)
-    {
-      result[out_pos] = '\0';
-    }
+    result[out_pos] = '\0';
     return result;
   }
 
@@ -196,12 +266,12 @@ namespace fho::detail
   type_str_msvc() -> std::string_view
   {
     constexpr auto raw = type_str_raw<T>();
-    // Find the function name 'type_str' to locate the template parameter
+    // Find the function name 'type_str_raw' to locate the template parameter
     constexpr auto fname     = std::string_view{"type_str_raw<"};
     constexpr auto fname_pos = raw.find(fname);
     if constexpr (fname_pos != std::string_view::npos)
     {
-      // Start of type T is after 'type_str<'
+      // Start of type T is after 'type_str_raw<'
       constexpr auto type_start = fname_pos + fname.size();
       // Find the closing '>' of the template parameter
       constexpr auto type_end = [&]() -> size_t
@@ -321,9 +391,7 @@ namespace fho::detail::test::reflect
 
   /// @brief TEST: Primitives
   static_assert(type_str<int>() == "int", "Fundamental type");
-  // NOTE: Currently borked because of the added string cleaning.
-  // static_assert(type_str<std::string>() == "string", "Class type");
-  // static_assert(type_str<int const>() == "int", "CV-qualified type");
+  static_assert(type_str<int const>() == "const int", "CV-qualified type");
   static_assert(type_str<int>() != type_str<float>(), "Distinct types");
 
   static_assert(type_str<int&>() == "int&", "Reference type");
