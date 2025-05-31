@@ -14,9 +14,9 @@
 // NOLINTBEGIN
 namespace fho::detail
 {
-  /// @brief  `constexpr` replacement for `std::isalnum`
+  /// @brief  `constexpr` replacement for `std::isalnum` + `_`
   constexpr bool
-  is_alnum(char c) noexcept
+  is_idchar(char c) noexcept
   {
     return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
   }
@@ -102,7 +102,7 @@ namespace fho::detail
       {
         id_start = i;
         // Skip identifier
-        while (i < input.size() && is_alnum(input[i]))
+        while (i < input.size() && is_idchar(input[i]))
         {
           i++;
         }
@@ -110,7 +110,7 @@ namespace fho::detail
         // Check if followed by :: or ::*
         if (i + 1 < input.size() && input[i] == ':' && input[i + 1] == ':')
         {
-          if (i + 2 < input.size() && !is_alnum(input[i + 2]))
+          if (i + 2 < input.size() && !is_idchar(input[i + 2]))
           {
             // It's ::*, so keep this identifier
             break;
