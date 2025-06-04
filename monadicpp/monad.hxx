@@ -6,6 +6,7 @@
 #include <monadicpp/detail/disambiguate.hxx>
 #include <monadicpp/detail/func_traits.hxx>
 
+#include <tuple>
 #include <utility>
 
 #define FWD(...) ::std::forward<decltype(__VA_ARGS__)>(__VA_ARGS__)
@@ -58,6 +59,126 @@ namespace fho
     // }
   };
 
+  // Forward declaration of monad2
+  template<typename... Computes>
+  class monad2;
+
+  // fmap_compose: Haskell fmap
+  struct fmap_compose
+  {
+    template<typename LhsMonad, typename Func>
+    constexpr auto
+    operator()(LhsMonad&& lhs, Func&& func) const
+    {
+      return monad2(
+        [lhs = FWD(lhs), func = FWD(func)]
+        {
+          return std::forward<Func>(func)(lhs.value());
+        });
+    }
+  };
+
+  // bind_compose: Haskell bind (>>=)
+  struct bind_compose
+  {
+    template<typename LhsMonad, typename Func>
+    constexpr auto
+    operator()(LhsMonad&& lhs, Func&& func) const
+    {
+      return monad2(
+        [lhs = FWD(lhs), func = FWD(func)]
+        {
+          return func(lhs.value()).value();
+        });
+    }
+  };
+
+  // ap_compose: Haskell applicative (<*>)
+  struct ap_compose
+  {
+    template<typename LhsMonad, typename RhsMonad>
+    constexpr auto
+    operator()(LhsMonad&& lhs, RhsMonad&& rhs) const
+    {
+      return bind_compose{}(FWD(lhs),
+                            [rhs = FWD(rhs)](auto&& g)
+                            {
+                              return fmap_compose{}(std::forward<RhsMonad>(rhs),
+                                                    std::forward_like<LhsMonad>(g));
+                            });
+    }
+  };
+
+  template<typename... Computes>
+  class monad2
+  {
+  public:
+    constexpr monad2(Computes... comps)
+      : computes_(std::move(comps)...)
+    {}
+
+    template<typename F>
+    constexpr auto
+    fmap(F&& f) const
+    {
+      return fho::monad2(*this, fmap_compose{}, FWD(f));
+    }
+
+    template<typename F>
+    constexpr auto
+    bind(F&& f) const
+    {
+      return fho::monad2(*this, bind_compose{}, FWD(f));
+    }
+
+    template<typename R>
+    constexpr auto
+    ap(R&& r) const
+    {
+      return fho::monad2(FWD(r), ap_compose{}, *this);
+    }
+
+    constexpr auto
+    value() const -> decltype(auto)
+    {
+      return unfold(computes_);
+    }
+
+    // private:
+    template<typename Single>
+    static constexpr auto
+    unfold(std::tuple<Single> const& t)
+    {
+      auto& s = std::get<0>(t);
+      if constexpr (requires { s.value(); })
+      {
+        return unfold(std::tuple(s.value()));
+      }
+      else if constexpr (std::is_invocable_v<Single>)
+      {
+        return s();
+      }
+      else
+      {
+        return s;
+      }
+    }
+
+    template<typename Lhs, typename Comp, typename Rhs, typename... Rest>
+    static constexpr auto
+    unfold(std::tuple<Lhs, Comp, Rhs, Rest...> const& t) -> decltype(auto)
+    {
+      auto& lhs  = std::get<0>(t);
+      auto& comp = std::get<1>(t);
+      auto& rhs  = std::get<2>(t);
+      auto  next = comp(lhs, rhs);
+      return unfold(std::tuple_cat(std::forward_as_tuple(std::move(next)),
+                                   std::forward_as_tuple(std::get<Rest>(t)...)));
+    }
+
+    std::tuple<Computes...> computes_;
+  };
+
   /// @brief A monad class for functional programming in C++.
   /// @details Encapsulates a computation `Comp` that produces a value of type `T`, enabling
   /// functional operations like mapping (Functor), application (Applicative), and chaining (Monad).
@@ -106,7 +227,7 @@ namespace fho
 
     /// @brief Chains a function to the monad’s value (`>>=` in Haskell).
     /// @tparam `F` Function (`bindable<F, monad>`) type taking `value_type` and returning a new
-    /// monad or a callable.
+    /// monad.
     /// @param `f` The function to chain, producing a new monad or callable from the value.
     /// @return A new monad with the chained computation.
     template<bindable<monad> F>
